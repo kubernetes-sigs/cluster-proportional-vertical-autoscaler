@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package autoscaler implements logic to poll the k8s apiserver for cluster status,
-// and update the replicas number of a deployment/rc/rs based on current status.
+// Package autoscaler implements logic to poll the k8s apiserver for cluster info,
+// and update the resources of a deployment based on current size.
 package autoscaler

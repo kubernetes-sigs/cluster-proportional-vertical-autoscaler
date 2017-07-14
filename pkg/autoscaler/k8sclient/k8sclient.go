@@ -17,44 +17,44 @@ limitations under the License.
 package k8sclient
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	apiv1 "k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/rest"
-
 	"github.com/golang/glog"
+
+	"k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/api/resource"
+	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
+	"k8s.io/client-go/1.4/rest"
+	"k8s.io/client-go/1.4/tools/clientcmd"
 )
 
 // K8sClient - Wraps all needed client functionalities for autoscaler
 type K8sClient interface {
-	// FetchConfigMap fetches the requested configmap from the Apiserver
-	FetchConfigMap(namespace, configmap string) (*apiv1.ConfigMap, error)
-	// CreateConfigMap creates a configmap with given namespace, name and params
-	CreateConfigMap(namespace, configmap string, params map[string]string) (*apiv1.ConfigMap, error)
-	// UpdateConfigMap updates a configmap with given namespace, name and params
-	UpdateConfigMap(namespace, configmap string, params map[string]string) (*apiv1.ConfigMap, error)
-	// GetClusterStatus counts schedulable nodes and cores in the cluster
-	GetClusterStatus() (clusterStatus *ClusterStatus, err error)
-	// GetNamespace returns the namespace of target resource.
-	GetNamespace() (namespace string)
-	// UpdateReplicas updates the number of replicas for the resource and return the previous replicas count
-	UpdateReplicas(expReplicas int32) (prevReplicas int32, err error)
+	// GetClusterSize counts schedulable nodes and cores in the cluster
+	GetClusterSize() (*ClusterSize, error)
+	// UpdateResources updates the resource needs for the containers in the target
+	UpdateResources(resources map[string]apiv1.ResourceRequirements) error
 }
 
-// k8sClient - Wraps all Kubernetes API client functionalities
+// k8sClient - Wraps all Kubernetes API client functionality.
 type k8sClient struct {
-	target        *scaleTarget
+	target        *targetSpec
 	clientset     *kubernetes.Clientset
-	clusterStatus *ClusterStatus
+	clusterStatus *ClusterSize
 }
 
 // NewK8sClient gives a k8sClient with the given dependencies.
-func NewK8sClient(namespace, target string) (K8sClient, error) {
-	config, err := rest.InClusterConfig()
+func NewK8sClient(namespace, target, kubeconfig string) (K8sClient, error) {
+	var config *rest.Config
+	var err error
+	if kubeconfig != "" {
+		config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		config, err = rest.InClusterConfig()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -65,124 +65,129 @@ func NewK8sClient(namespace, target string) (K8sClient, error) {
 		return nil, err
 	}
 
-	scaleTarget, err := getScaleTarget(target, namespace)
+	tgt, err := makeTarget(clientset, target, namespace)
 	if err != nil {
 		return nil, err
 	}
 
 	return &k8sClient{
 		clientset: clientset,
-		target:    scaleTarget,
+		target:    tgt,
 	}, nil
 }
 
-func getScaleTarget(target, namespace string) (*scaleTarget, error) {
+func makeTarget(client *kubernetes.Clientset, target, namespace string) (*targetSpec, error) {
 	splits := strings.Split(target, "/")
 	if len(splits) != 2 {
-		return &scaleTarget{}, fmt.Errorf("target format error: %v", target)
+		return &targetSpec{}, fmt.Errorf("target format error: %v", target)
 	}
 	kind := splits[0]
 	name := splits[1]
-	return &scaleTarget{kind, name, namespace}, nil
+
+	kind, apigroup, apiver, err := discoverAPI(client, kind)
+	if err != nil {
+		return nil, err
+	}
+	glog.V(4).Infof("discovered target %s = %s/%s.%s", target, apigroup, apiver, kind)
+	return &targetSpec{kind, apigroup, apiver, name, namespace}, nil
 }
 
-// scaleTarget stores the scalable target recourse
-type scaleTarget struct {
+func discoverAPI(client *kubernetes.Clientset, kindArg string) (kind string, apigroup string, apiver string, err error) {
+	kind = ""
+	plural := ""
+	switch strings.ToLower(kindArg) {
+	case "deployment":
+		kind = "Deployment"
+		plural = "deployments"
+	default:
+		return "", "", "", fmt.Errorf("unknown kind %q", kindArg)
+	}
+	resources, err := client.Discovery().ServerPreferredNamespacedResources()
+	if err != nil {
+		return "", "", "", fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
+	}
+	apigroup = ""
+	apiver = ""
+	for _, res := range resources {
+		if res.Resource == plural {
+			// Avoid legacy "extensions" if we can.
+			if apigroup == "" || apigroup == "extensions" {
+				apigroup = res.Group
+				apiver = res.Version
+			}
+		}
+	}
+	return kind, apigroup, apiver, nil
+}
+
+// targetSpec stores the scalable target resource.
+type targetSpec struct {
 	kind      string
+	group     string
+	version   string
 	name      string
 	namespace string
 }
 
-func (k *k8sClient) GetNamespace() (namespace string) {
-	return k.target.namespace
+// ClusterSize defines the cluster status.
+type ClusterSize struct {
+	Nodes int
+	Cores int
 }
 
-func (k *k8sClient) FetchConfigMap(namespace, configmap string) (*apiv1.ConfigMap, error) {
-	cm, err := k.clientset.CoreV1().ConfigMaps(namespace).Get(configmap, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return cm, nil
-}
+func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
+	opt := api.ListOptions{Watch: false}
 
-func (k *k8sClient) CreateConfigMap(namespace, configmap string, params map[string]string) (*apiv1.ConfigMap, error) {
-	providedConfigMap := apiv1.ConfigMap{}
-	providedConfigMap.ObjectMeta.Name = configmap
-	providedConfigMap.ObjectMeta.Namespace = namespace
-	providedConfigMap.Data = params
-	cm, err := k.clientset.CoreV1().ConfigMaps(namespace).Create(&providedConfigMap)
-	if err != nil {
-		return nil, err
-	}
-	glog.V(0).Infof("Created ConfigMap %v in namespace %v", configmap, namespace)
-	return cm, nil
-}
-
-func (k *k8sClient) UpdateConfigMap(namespace, configmap string, params map[string]string) (*apiv1.ConfigMap, error) {
-	providedConfigMap := apiv1.ConfigMap{}
-	providedConfigMap.ObjectMeta.Name = configmap
-	providedConfigMap.ObjectMeta.Namespace = namespace
-	providedConfigMap.Data = params
-	cm, err := k.clientset.CoreV1().ConfigMaps(namespace).Update(&providedConfigMap)
-	if err != nil {
-		return nil, err
-	}
-	glog.V(0).Infof("Updated ConfigMap %v in namespace %v", configmap, namespace)
-	return cm, nil
-}
-
-// ClusterStatus defines the cluster status
-type ClusterStatus struct {
-	TotalNodes       int32
-	SchedulableNodes int32
-	TotalCores       int32
-	SchedulableCores int32
-}
-
-func (k *k8sClient) GetClusterStatus() (clusterStatus *ClusterStatus, err error) {
-	opt := metav1.ListOptions{Watch: false}
-
-	nodes, err := k.clientset.CoreV1().Nodes().List(opt)
+	nodes, err := k.clientset.Nodes().List(opt)
 	if err != nil || nodes == nil {
 		return nil, err
 	}
-	clusterStatus = &ClusterStatus{}
-	clusterStatus.TotalNodes = int32(len(nodes.Items))
+	clusterStatus = &ClusterSize{}
+	clusterStatus.Nodes = len(nodes.Items)
 	var tc resource.Quantity
-	var sc resource.Quantity
 	for _, node := range nodes.Items {
 		tc.Add(node.Status.Capacity[apiv1.ResourceCPU])
-		if !node.Spec.Unschedulable {
-			clusterStatus.SchedulableNodes++
-			sc.Add(node.Status.Capacity[apiv1.ResourceCPU])
-		}
 	}
 
 	tcInt64, tcOk := tc.AsInt64()
-	scInt64, scOk := sc.AsInt64()
-	if !tcOk || !scOk {
-		return nil, fmt.Errorf("unable to compute integer values of schedulable cores in the cluster")
+	if !tcOk {
+		return nil, fmt.Errorf("unable to compute integer values of cores in the cluster")
 	}
-	clusterStatus.TotalCores = int32(tcInt64)
-	clusterStatus.SchedulableCores = int32(scInt64)
+	clusterStatus.Cores = int(tcInt64)
 	k.clusterStatus = clusterStatus
 	return clusterStatus, nil
 }
 
-func (k *k8sClient) UpdateReplicas(expReplicas int32) (prevRelicas int32, err error) {
-	scale, err := k.clientset.Extensions().Scales(k.target.namespace).Get(k.target.kind, k.target.name)
+// TODO: this should switch on resource kind to handle ReplicaSets.
+func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequirements) error {
+	ctrs := []interface{}{}
+	for ctrName, res := range resources {
+		ctrs = append(ctrs, map[string]interface{}{
+			"name":      ctrName,
+			"resources": res,
+		})
+	}
+	patch := map[string]interface{}{
+		"apiVersion": fmt.Sprintf("%s/%s", k.target.group, k.target.version),
+		"kind":       k.target.kind,
+		"metadata": map[string]interface{}{
+			"name": k.target.name,
+		},
+		"spec": map[string]interface{}{
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"containers": ctrs,
+				},
+			},
+		},
+	}
+	jb, err := json.Marshal(patch)
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("can't marshal patch to JSON: %v", err)
 	}
-	prevRelicas = scale.Spec.Replicas
-	if expReplicas != prevRelicas {
-		glog.V(0).Infof("Cluster status: SchedulableNodes[%v], SchedulableCores[%v]", k.clusterStatus.SchedulableNodes, k.clusterStatus.SchedulableCores)
-		glog.V(0).Infof("Replicas are not as expected : updating replicas from %d to %d", prevRelicas, expReplicas)
-		scale.Spec.Replicas = expReplicas
-		_, err = k.clientset.Extensions().Scales(k.target.namespace).Update(k.target.kind, scale)
-		if err != nil {
-			return 0, err
-		}
+	_, err = k.clientset.Deployments(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb)
+	if err != nil {
+		return fmt.Errorf("patch failed: %v", err)
 	}
-	return prevRelicas, nil
+	return nil
 }

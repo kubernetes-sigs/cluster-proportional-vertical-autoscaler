@@ -13,10 +13,10 @@
 # limitations under the License.
 
 # The binary to build (just the basename).
-BIN := cluster-proportional-autoscaler
+BIN := cpvpa
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/kubernetes-incubator/cluster-proportional-autoscaler
+PKG := github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler
 
 # Where to push the docker image.
 REGISTRY ?= gcr.io/google_containers

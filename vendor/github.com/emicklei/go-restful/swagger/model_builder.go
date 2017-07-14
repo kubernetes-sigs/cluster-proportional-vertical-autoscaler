@@ -382,7 +382,7 @@ func (b modelBuilder) jsonNameOfField(field reflect.StructField) string {
 	return field.Name
 }
 
-// see also http://json-schema.org/latest/json-schema-core.html#anchor8
+// see also http://json-schema.org/latest/json-schema-testing.html#anchor8
 func (b modelBuilder) jsonSchemaType(modelName string) string {
 	schemaMap := map[string]string{
 		"uint":   "integer",
