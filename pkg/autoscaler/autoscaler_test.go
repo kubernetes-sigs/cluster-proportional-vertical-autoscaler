@@ -16,187 +16,247 @@ limitations under the License.
 
 package autoscaler
 
-/* //FIXME:
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"testing"
+	"time"
+
+	k8sclient "github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient/testing"
+	"k8s.io/client-go/1.4/pkg/util/clock"
+)
+
 func TestRun(t *testing.T) {
-	testConfigMap := apiv1.ConfigMap{
-		Data: make(map[string]string),
-	}
-	testConfigMap.ObjectMeta.ResourceVersion = `1`
-	testConfigMap.Data[laddercontroller.ControllerType] =
-		`{
-			"coresToReplicas":
-			[
-				[1, 1],
-				[2, 2],
-				[3, 3],
-				[512, 5],
-				[1024, 7],
-				[2048, 10],
-				[4096, 15],
-				[8192, 20],
-				[12288, 30],
-				[16384, 40],
-				[20480, 50],
-				[24576, 60],
-				[28672, 70],
-				[32768, 80],
-				[65535, 100]
-			],
-			"nodesToReplicas":
-			[
-				[ 1,1 ],
-				[ 2,2 ]
-			]
-		}`
+	var asConfig = `
+{
+  "fake-agent": {
+    "requests": {
+      "cpu": {
+        "base": "10m", "increment":"1m", "coresPerIncrement":1
+      },
+      "memory": {
+        "base": "8Mi", "increment":"1Mi", "coresPerIncrement":1
+      }
+    }
+  }
+}
+`
 	mockK8s := k8sclient.MockK8sClient{
-		NumOfNodes:    0,
-		NumOfCores:    0,
-		NumOfReplicas: 0,
-		ConfigMap:     &testConfigMap,
+		NumOfNodes: 4,
+		NumOfCores: 7,
 	}
 
 	fakeClock := clock.NewFakeClock(time.Now())
 	fakePollPeriod := 5 * time.Second
-	fakeConfigMapName := "fake-cluster-proportional-vertical-autoscaler-params"
+	cfg := ScaleConfig{}
+	if err := json.Unmarshal([]byte(asConfig), &cfg); err != nil {
+		log.Fatalf("invalid default config: %v", err)
+	}
 	autoScaler := &AutoScaler{
 		k8sClient:     &mockK8s,
-		clock:         fakeClock,
+		defaultConfig: cfg,
+		configFile:    asConfig,
 		pollPeriod:    fakePollPeriod,
-		configMapName: fakeConfigMapName,
+		clock:         fakeClock,
 		stopCh:        make(chan struct{}),
 		readyCh:       make(chan<- struct{}, 1),
 	}
 
 	go autoScaler.Run()
 	defer close(autoScaler.stopCh)
-
-	t.Logf("Scenario: cluster size changing\n")
-	t.Logf("Wait for the number of replicas be scaled to 1 even no node and no core)\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 1); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 800
-	mockK8s.NumOfNodes = 1
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 5 when there are 800 cores and 1 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 5); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 1
-	mockK8s.NumOfNodes = 3
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 2 when there are 1 cores and 3 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 2); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 200000
-	mockK8s.NumOfNodes = 50000
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 100 when there are 200000 cores and 50000 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 100); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	t.Logf("Scenario: ConfigMap is changed\n")
-	mockK8s.ConfigMap.Data[laddercontroller.ControllerType] =
-		`{
-			"coresToReplicas":
-			[
-				[1, 1],
-				[2, 2],
-				[3, 4],
-				[512, 5],
-				[1024, 7],
-				[2048, 10],
-				[4096, 15],
-				[8192, 20],
-				[12288, 30],
-				[16384, 40],
-				[20480, 50],
-				[24576, 60],
-				[28672, 70],
-				[32768, 80],
-				[65535, 200]
-			],
-			"nodesToReplicas":
-			[
-				[ 1,1 ],
-				[ 2,2 ]
-			]
-		}`
-	mockK8s.ConfigMap.ObjectMeta.ResourceVersion = `2`
-
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 200 with new configuration)\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 200); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 500
-	mockK8s.NumOfNodes = 100
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 4 when there are 500 cores and 100 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 4); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	t.Logf("Scenario: ConfigMap is missing and later appears again\n")
-	mockK8s.ConfigMap.ObjectMeta.ResourceVersion = ""
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("And cluster size changed in between\n")
-	mockK8s.NumOfCores = 2000
-	mockK8s.NumOfNodes = 400
-	mockK8s.ConfigMap.ObjectMeta.ResourceVersion = "3"
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 7 when there are 2000 cores and 400 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 7); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	t.Logf("Scenario: Switch control mode on the fly\n")
-	delete(mockK8s.ConfigMap.Data, laddercontroller.ControllerType)
-	mockK8s.ConfigMap.Data[linearcontroller.ControllerType] =
-		`{
-			"coresPerReplica": 100,
-			"nodesPerReplica": 10,
-			"min": 1,
-			"max": 100
-		}`
-	mockK8s.ConfigMap.ObjectMeta.ResourceVersion = `4`
-
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 40 with new configuration)\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 40); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 1600
-	mockK8s.NumOfNodes = 100
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 16 when there are 1600 cores and 100 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 16); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
-
-	mockK8s.NumOfCores = 100000
-	mockK8s.NumOfNodes = 20000
-	fakeClock.Step(fakePollPeriod)
-	t.Logf("Wait for the number of replicas be scaled to 100 when there are 100000 cores and 20000 node\n")
-	if err := waitForReplicasNumberSatisfy(t, &mockK8s, 100); err != nil {
-		t.Fatalf("Timeout waiting for condition: %v", err)
-	}
 }
 
-func waitForReplicasNumberSatisfy(t *testing.T, mockK8s *k8sclient.MockK8sClient, replicas int) error {
-	return wait.Poll(50*time.Millisecond, 3*time.Second, func() (done bool, err error) {
-		if mockK8s.NumOfReplicas != replicas {
-			t.Logf("Error number of replicas, expected: %d, got %d\n", replicas, mockK8s.NumOfReplicas)
-			return false, nil
+func TestCalculatePerCores(t *testing.T) {
+	var coresPerIncrement = `
+{
+  "fake-agent": {
+    "requests": {
+      "cpu": {
+        "base": "%dm", "increment":"%dm", "coresPerIncrement":%d
+      }
+    }
+  }
+}
+`
+	for _, tt := range []struct {
+		name         string
+		numNodes     int
+		numCores     int
+		expVal       int64
+		base         int
+		increment    int
+		perIncrement int
+	}{
+		{
+			"base 10, increment 1,  per increment 1",
+			4,
+			7,
+			17,
+			10,
+			1,
+			1,
+		},
+		{
+			"base 10, increment 2, per increment 1",
+			4,
+			7,
+			24,
+			10,
+			2,
+			1,
+		},
+		{
+			"base 10, increment 2, per increment 2",
+			4,
+			20,
+			30,
+			10,
+			2,
+			2,
+		},
+		{
+			"base 10, increment 4, per increment 3",
+			4,
+			20,
+			20,
+			10,
+			1,
+			2,
+		},
+		{
+			"base 10, increment 1, per increment 0",
+			4,
+			20,
+			10,
+			10,
+			1,
+			0,
+		},
+		{
+			"base 10, increment 1, per increment -22",
+			4,
+			20,
+			10,
+			10,
+			1,
+			-2,
+		},
+	} {
+		mockK8s := k8sclient.MockK8sClient{
+			NumOfNodes: tt.numNodes,
+			NumOfCores: tt.numCores,
 		}
-		return true, nil
-	})
+		conf := fmt.Sprintf(coresPerIncrement, tt.base, tt.increment, tt.perIncrement)
+		cfg := ScaleConfig{}
+		if err := json.Unmarshal([]byte(conf), &cfg); err != nil {
+			t.Fatalf("invalid default config: %v", err)
+		}
+
+		sz, err := mockK8s.GetClusterSize()
+		if err != nil {
+			t.Errorf("failed to get cluster size")
+		}
+		val := calculate(cfg["fake-agent"].Requests["cpu"], sz)
+		if val != tt.expVal {
+			t.Errorf("expected %d got %d", tt.expVal, val)
+		}
+	}
 }
-*/
+
+func TestCalculatePerNodes(t *testing.T) {
+	var nodesPerIncrement = `
+{
+  "fake-agent": {
+    "requests": {
+      "cpu": {
+        "base": "%dm", "increment":"%dm", "nodesPerIncrement":%d
+      }
+    }
+  }
+}
+`
+	for _, tt := range []struct {
+		name         string
+		numNodes     int
+		numCores     int
+		expVal       int64
+		base         int
+		increment    int
+		perIncrement int
+	}{
+		{
+			"base 10, increment 1,  per increment 1",
+			4,
+			7,
+			14,
+			10,
+			1,
+			1,
+		},
+		{
+			"base 10, increment 2, per increment 1",
+			4,
+			7,
+			18,
+			10,
+			2,
+			1,
+		},
+		{
+			"base 10, increment 2, per increment 2",
+			4,
+			20,
+			14,
+			10,
+			2,
+			2,
+		},
+		{
+			"base 10, increment 4, per increment 3",
+			4,
+			20,
+			12,
+			10,
+			1,
+			2,
+		},
+		{
+			"base 10, increment 1, per increment 0",
+			4,
+			20,
+			10,
+			10,
+			1,
+			0,
+		},
+		{
+			"base 10, increment 1, per increment -2",
+			4,
+			20,
+			10,
+			10,
+			1,
+			-2,
+		},
+	} {
+		mockK8s := k8sclient.MockK8sClient{
+			NumOfNodes: tt.numNodes,
+			NumOfCores: tt.numCores,
+		}
+		conf := fmt.Sprintf(nodesPerIncrement, tt.base, tt.increment, tt.perIncrement)
+		cfg := ScaleConfig{}
+		if err := json.Unmarshal([]byte(conf), &cfg); err != nil {
+			t.Fatalf("invalid default config: %v", err)
+		}
+
+		sz, err := mockK8s.GetClusterSize()
+		if err != nil {
+			t.Errorf("failed to get cluster size")
+		}
+		val := calculate(cfg["fake-agent"].Requests["cpu"], sz)
+		if val != tt.expVal {
+			t.Errorf("expected %d got %d", tt.expVal, val)
+		}
+	}
+}

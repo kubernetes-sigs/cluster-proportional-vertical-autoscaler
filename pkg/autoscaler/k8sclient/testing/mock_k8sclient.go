@@ -34,8 +34,7 @@ func (k *MockK8sClient) GetClusterSize() (*k8sclient.ClusterSize, error) {
 	return &k8sclient.ClusterSize{k.NumOfNodes, k.NumOfCores}, nil
 }
 
-// UpdateReplicas mocks updating the number of replicas for the resource and return the previous replicas count
+// UpdateResources mocks updating resources needs for containers in the target
 func (k *MockK8sClient) UpdateResources(resources map[string]apiv1.ResourceRequirements) error {
-	//FIXME:
 	return nil
 }
