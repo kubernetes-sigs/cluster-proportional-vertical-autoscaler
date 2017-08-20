@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+ Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,9 +18,48 @@ package k8sclient
 
 import (
 	"testing"
+
+	"k8s.io/client-go/1.4/kubernetes/fake"
+	"k8s.io/client-go/1.4/pkg/api/resource"
+	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
 )
 
-func TestGetScaleTarget(t *testing.T) {
+func TestDiscoverAPI(t *testing.T) {
+	testCases := []struct {
+		kind     string
+		expError bool
+	}{
+		{
+			"deployment",
+			false,
+		},
+		{
+			"daemonset",
+			false,
+		},
+		{
+			"replicaset",
+			false,
+		},
+		{
+			"replicationcontroller",
+			true,
+		},
+	}
+	c := fake.NewSimpleClientset()
+	for _, tc := range testCases {
+		_, _, _, err := discoverAPI(c, tc.kind)
+		if err != nil && !tc.expError {
+			t.Errorf("Expect no error, got error for kind: %q: %v", tc.kind, err)
+			continue
+		} else if err == nil && tc.expError {
+			t.Errorf("Expect error, got no error for kind: %q", tc.kind)
+			continue
+		}
+	}
+}
+
+func TestMakeTarget(t *testing.T) {
 	testCases := []struct {
 		target   string
 		expKind  string
@@ -28,42 +67,98 @@ func TestGetScaleTarget(t *testing.T) {
 		expError bool
 	}{
 		{
-			"deployment/anything",
-			"deployment",
-			"anything",
+			"deployment/thing",
+			"Deployment",
+			"thing",
 			false,
 		},
 		{
-			"replicationcontroller/anotherthing",
-			"replicationcontroller",
-			"anotherthing",
+			"daemonset/thing",
+			"DaemonSet",
+			"thing",
 			false,
 		},
 		{
-			"replicationcontroller",
+			"replicaset/thing",
+			"ReplicaSet",
+			"thing",
+			false,
+		},
+		{
+			"replicationcontroller/thing",
 			"",
 			"",
 			true,
 		},
 		{
-			"replicaset/anything/what",
+			"daemonset/thing1/thing2",
 			"",
 			"",
 			true,
 		},
 	}
-
+	c := fake.NewSimpleClientset()
 	for _, tc := range testCases {
-		res, err := getScaleTarget(tc.target, "default")
+		target, err := makeTarget(c, tc.target, "test")
 		if err != nil && !tc.expError {
-			t.Errorf("Expect no error, got error for target: %v", tc.target)
+			t.Errorf("expect no error, got error for target: %q: %v", tc.target, err)
 			continue
 		} else if err == nil && tc.expError {
-			t.Errorf("Expect error, got no error for target: %v", tc.target)
+			t.Errorf("expect error, got no error for target: %q", tc.target)
+			continue
+		} else if tc.expKind != target.kind {
+			t.Errorf("expected kind: %q, got %q", tc.expKind, target.kind)
+			continue
+		} else if tc.expName != target.name {
+			t.Errorf("expected name: %q, got %q", tc.expName, target.name)
 			continue
 		}
-		if res.kind != tc.expKind || res.name != tc.expName {
-			t.Errorf("Expect kind: %v, name: %v\ngot kind: %v, name: %v", tc.expKind, tc.expName, res.kind, res.name)
+	}
+}
+
+func TestUpdateResources(t *testing.T) {
+	testCases := []struct {
+		target   string
+		res      int
+		expError bool
+	}{
+		{
+			"deployment/thing",
+			10,
+			false,
+		},
+		{
+			"daemonset/thing",
+			20,
+			false,
+		},
+		{
+			"replicaset/thing",
+			30,
+			false,
+		},
+	}
+	for _, tc := range testCases {
+		c := fake.NewSimpleClientset()
+		target, err := makeTarget(c, tc.target, "test")
+		if err != nil {
+			t.Errorf("failed to make target %q: %v", target, err)
+		}
+
+		k8scli := k8sClient{
+			clientset: c,
+			target:    target,
+		}
+		newReqs := map[string]apiv1.ResourceRequirements{}
+		newReqs["thing"] = apiv1.ResourceRequirements{
+			Requests: map[apiv1.ResourceName]resource.Quantity{},
+			Limits:   map[apiv1.ResourceName]resource.Quantity{},
+		}
+		r := resource.NewQuantity(0, resource.BinarySI)
+		r.SetMilli(10)
+		newReqs["thing"].Requests[apiv1.ResourceName("cpu")] = *r
+		if err := k8scli.UpdateResources(newReqs); err != nil {
+			t.Errorf("failed to update resources for target %q: %v", target, err)
 		}
 	}
 }

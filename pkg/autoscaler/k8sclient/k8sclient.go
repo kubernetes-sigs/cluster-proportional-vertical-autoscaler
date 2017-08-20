@@ -42,7 +42,7 @@ type K8sClient interface {
 // k8sClient - Wraps all Kubernetes API client functionality.
 type k8sClient struct {
 	target        *targetSpec
-	clientset     *kubernetes.Clientset
+	clientset     kubernetes.Interface
 	clusterStatus *ClusterSize
 }
 
@@ -76,7 +76,7 @@ func NewK8sClient(namespace, target, kubeconfig string) (K8sClient, error) {
 	}, nil
 }
 
-func makeTarget(client *kubernetes.Clientset, target, namespace string) (*targetSpec, error) {
+func makeTarget(client kubernetes.Interface, target, namespace string) (*targetSpec, error) {
 	splits := strings.Split(target, "/")
 	if len(splits) != 2 {
 		return &targetSpec{}, fmt.Errorf("target format error: %v", target)
@@ -86,19 +86,25 @@ func makeTarget(client *kubernetes.Clientset, target, namespace string) (*target
 
 	kind, apigroup, apiver, err := discoverAPI(client, kind)
 	if err != nil {
-		return nil, err
+		return &targetSpec{}, err
 	}
 	glog.V(4).Infof("discovered target %s = %s/%s.%s", target, apigroup, apiver, kind)
 	return &targetSpec{kind, apigroup, apiver, name, namespace}, nil
 }
 
-func discoverAPI(client *kubernetes.Clientset, kindArg string) (kind string, apigroup string, apiver string, err error) {
+func discoverAPI(client kubernetes.Interface, kindArg string) (kind, apigroup, apiver string, err error) {
 	kind = ""
 	plural := ""
 	switch strings.ToLower(kindArg) {
 	case "deployment":
 		kind = "Deployment"
 		plural = "deployments"
+	case "daemonset":
+		kind = "DaemonSet"
+		plural = "daemonsets"
+	case "replicaset":
+		kind = "ReplicaSet"
+		plural = "ReplicaSets"
 	default:
 		return "", "", "", fmt.Errorf("unknown kind %q", kindArg)
 	}
@@ -138,13 +144,15 @@ type ClusterSize struct {
 func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
 	opt := api.ListOptions{Watch: false}
 
-	nodes, err := k.clientset.Nodes().List(opt)
+	nodes, err := k.clientset.Core().Nodes().List(opt)
 	if err != nil || nodes == nil {
 		return nil, err
 	}
 	clusterStatus = &ClusterSize{}
 	clusterStatus.Nodes = len(nodes.Items)
 	var tc resource.Quantity
+	// All nodes are considered, even those that are marked as unshedulable,
+	// this includes the master.
 	for _, node := range nodes.Items {
 		tc.Add(node.Status.Capacity[apiv1.ResourceCPU])
 	}
@@ -158,7 +166,6 @@ func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
 	return clusterStatus, nil
 }
 
-// TODO: this should switch on resource kind to handle ReplicaSets.
 func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequirements) error {
 	ctrs := []interface{}{}
 	for ctrName, res := range resources {
@@ -185,9 +192,23 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 	if err != nil {
 		return fmt.Errorf("can't marshal patch to JSON: %v", err)
 	}
-	_, err = k.clientset.Deployments(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb)
-	if err != nil {
-		return fmt.Errorf("patch failed: %v", err)
+	kind := strings.ToLower(k.target.kind)
+	switch kind {
+	case "deployment":
+		if _, err := k.clientset.Extensions().Deployments(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+			return fmt.Errorf("patch failed: %v", err)
+		}
+	case "daemonset":
+		if _, err := k.clientset.Extensions().DaemonSets(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+			return fmt.Errorf("patch failed: %v", err)
+		}
+	case "replicaset":
+		if _, err := k.clientset.Extensions().ReplicaSets(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+			return fmt.Errorf("patch failed: %v", err)
+		}
+	default:
+		return fmt.Errorf("Unknown target format: must be one of deployment/*, daemonset/*, or replicaset/* (not case sensitive).")
 	}
+
 	return nil
 }

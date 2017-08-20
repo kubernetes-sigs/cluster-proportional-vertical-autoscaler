@@ -31,16 +31,24 @@ func TestIsTargetFormatValid(t *testing.T) {
 			true,
 		},
 		{
-			"replicationcontroller/anything",
-			true,
-		},
-		{
 			"replicaset/anything",
 			true,
 		},
 		{
 			"DeplOymEnT/anything",
 			true,
+		},
+		{
+			"daemonset/anything",
+			true,
+		},
+		{
+			"DaeMonSet/anything",
+			true,
+		},
+		{
+			"replicationcontroller/anything",
+			false,
 		},
 		{
 			"deployments/anything",
@@ -52,6 +60,10 @@ func TestIsTargetFormatValid(t *testing.T) {
 		},
 		{
 			"deployment",
+			false,
+		},
+		{
+			"daemonset",
 			false,
 		},
 	}
