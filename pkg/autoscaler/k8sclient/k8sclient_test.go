@@ -19,9 +19,9 @@ package k8sclient
 import (
 	"testing"
 
-	"k8s.io/client-go/1.4/kubernetes/fake"
-	"k8s.io/client-go/1.4/pkg/api/resource"
-	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 func TestDiscoverAPI(t *testing.T) {
@@ -48,7 +48,7 @@ func TestDiscoverAPI(t *testing.T) {
 	}
 	c := fake.NewSimpleClientset()
 	for _, tc := range testCases {
-		_, _, _, err := discoverAPI(c, tc.kind)
+		_, _, err := discoverAPI(c, tc.kind)
 		if err != nil && !tc.expError {
 			t.Errorf("Expect no error, got error for kind: %q: %v", tc.kind, err)
 			continue

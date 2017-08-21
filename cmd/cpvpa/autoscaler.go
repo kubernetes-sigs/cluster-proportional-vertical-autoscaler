@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/apiserver/pkg/util/flag"
-
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler"
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/version"
@@ -33,13 +31,12 @@ import (
 func main() {
 	config := options.NewAutoScalerConfig()
 	config.AddFlags(pflag.CommandLine)
-	flag.InitFlags()
+	config.InitFlags()
 
 	if config.PrintVer {
 		fmt.Printf("%s\n", version.VERSION)
 		os.Exit(0)
 	}
-
 	// Perform further validation of flags.
 	if err := config.ValidateFlags(); err != nil {
 		glog.Errorf("%v", err)
