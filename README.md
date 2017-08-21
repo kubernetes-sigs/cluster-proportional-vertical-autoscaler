@@ -1,29 +1,29 @@
-FIXME
-# Horizontal cluster-proportional-autoscaler container
+# cluster-proportional-vertical-autoscaler container
 
-[![Build Status](https://travis-ci.org/kubernetes-incubator/cluster-proportional-autoscaler.png)](https://travis-ci.org/kubernetes-incubator/cluster-proportional-autoscaler)
-[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cluster-proportional-autoscaler)](https://goreportcard.com/report/github.com/kubernetes-incubator/cluster-proportional-autoscaler)
+[![Build Status](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler.png)](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)](https://goreportcard.com/report/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
 
 ## Overview
 
-This container image watches over the number of schedulable nodes and cores of the cluster and resizes
-the number of replicas for the required resource. This functionality may be desirable for applications
-that need to be autoscaled with the size of the cluster, such as DNS and other services that scale
-with the number of nodes/pods in the cluster.
+This container image watches over the number of nodes and cores of the cluster and resizes
+the resource limits and requests for a DaemonSet, ReplicaSet, or Deployment. This functionality 
+may be desirable for applications where resources such as cpu and memory for a particular job need 
+to be autoscaled with the size of the cluster.
 
-Usage of cluster-proportional-autoscaler:
+Usage of cluster-proportional-vertical-autoscaler:
 
 ```
       --alsologtostderr[=false]: log to standard error as well as files
-      --configmap="": ConfigMap containing our scaling parameters.
-      --default-params=map[]: Default parameters(JSON format) for auto-scaling. Will create/re-create a ConfigMap with this default params if ConfigMap is not present.
+      --config-file: The default configuration (in JSON format).
+      --default-config: A config file (in JSON format), which overrides the --default-config.
+      --kube-config="": Path to a kubeconfig. Only required if running out-of-cluster.
       --log-backtrace-at=:0: when logging hits line file:N, emit a stack trace
       --log-dir="": If non-empty, write log files in this directory
       --logtostderr[=false]: log to standard error instead of files
-      --namespace="": Namespace for all operations, fallback to the namespace of this autoscaler(through MY_POD_NAMESPACE env) if not specified.
-      --poll-period-seconds=10: The time, in seconds, to check cluster status and perform autoscale.
+      --namespace="": The Namespace of the --target. Defaults to ${MY_NAMESPACE}.
+      --poll-period-seconds=10: The period, in seconds, to poll cluster size and perform autoscaling.
       --stderrthreshold=2: logs at or above this threshold go to stderr
-      --target="": Target to scale. In format: deployment/*, replicationcontroller/* or replicaset/* (not case sensitive).
+      --target="": Target to scale. In format: deployment/*, replicaset/* or daemonset/* (not case sensitive).
       --v=0: log level for V logs
       --version[=false]: Print the version and exit.
       --vmodule=: comma-separated list of pattern=N settings for file-filtered logging
@@ -39,105 +39,135 @@ The code in this module is a Kubernetes Golang API client that, using the defaul
 available to Golang clients running inside pods, it connects to the API server and polls for the number of nodes
 and cores in the cluster.
 
-The scaling parameters and data points are provided via a ConfigMap to the autoscaler and it refreshes its
-parameters table every poll interval to be up to date with the latest desired scaling parameters.
+The scaling parameters and data points are provided via a config file in JSON format to the autoscaler and it 
+refreshes its parameters table every poll interval to be up to date with the latest desired scaling parameters.
 
-### Calculation of number of replicas
+### Calculation of resource requests and limits
 
-The desired number of replicas is computed by using the number of cores and nodes as input of the chosen controller.
+The resource requests and limits are computed by using the number of cores and nodes as input as well as
+the provided increment values bounded by provided base and max values.
 
-This may be later extended to more complex interpolation or exponential scaling schemes
-but it currently supports `linear` and `ladder` modes.
-
-## Control patterns and ConfigMap formats
-
-The ConfigMap provides the configuration parameters, allowing on-the-fly changes(including control mode) without
-rebuilding or restarting the scaler containers/pods.
-
-Currently the two supported ConfigMap key value is: `ladder` and `linear`, which corresponding to two supported control mode.
-
-### Linear Mode
-
-Parameters in ConfigMap must be JSON and use `linear` as key. The sub-keys as below indicates:
+Example:
 
 ```
-data:
-  linear: |-
-    {
-      "coresPerReplica": 2,
-      "nodesPerReplica": 1,
-      "min": 1,
-      "max": 100,
-      "preventSinglePointFailure": true
+Base = 10
+Max = 100
+Increment = 2
+CoresPerIncrement = 4
+NodesPerIncrement = 2
+
+The core and node counts are rounded up to the next whole increment.
+
+If we find 64 cores and 4 nodes we get scalars of:
+  by-cores: 10 + (2 * (round(64, 4)/4)) = 10 + 32 = 42
+  by-nodes: 10 + (2 * (round(4, 2)/2)) = 10 + 4 = 14
+  
+The larger is by-cores, and it is less than Max, so the final value is 42.
+
+If we find 3 cores and 3 nodes we get scalars of:
+  by-cores: 10 + (2 * (round(3, 4)/4)) = 10 + 2 = 12
+  by-nodes: 10 + (2 * (round(3, 2)/2)) = 10 + 4 = 14
+```
+
+## Config parameters
+
+The configuration should be in JSON format and supports the following parameters:
+  - **base** The baseline quantity required.
+  - **max**  The maximum allowed quantity.
+  - **increment** The amount of additional resources to grow by.  If this is too fine-grained, the resizing action will happen too frequently.
+  - **coresPerIncrement** The number of cores required to trigger an increment.
+  - **nodesPerIncrement** The number of nodes required to trigger an increment.
+      
+Example:
+
+```
+"containerA": {
+  "requests": {
+    "cpu": {
+      "base": "10m", "increment":"1m", "coresPerIncrement":1
+    },
+    "memory": {
+      "base": "8Mi", "increment":"1Mi", "coresPerIncrement":1
     }
+  }
+"containerB": {
+  "requests": {
+    "cpu": {
+      "base": "250m", "increment":"100m", "coresPerIncrement":10
+    },
+  }
+}
 ```
 
-The equation of linear control mode as below:
-```
-replicas = max( ceil( cores * 1/coresPerReplica ) , ceil( nodes * 1/nodesPerReplica ) )
-replicas = min(replicas, max)
-replicas = max(replicas, min)
-```
+## Running the cluster-proportional-vertical-autoscaler
+This repo includes an example yaml files in the "Example" folder that can be used as examples demonstrating 
+how to use the vertical autoscaler.
 
-When `preventSinglePointFailure` is set to `true`, controller ensures at least 2 replicas
-if there are more than one node.
-
-For instance, given a cluster has 4 nodes and 13 cores. With above parameters, each replica could take care of 1 node.
-So we need `4 / 1 = 4` replicas to take care of all 4 nodes. And each replica could take care of 2 cores. We need `ceil(13 / 2) = 7`
-replicas to take care of all 13 cores. Controller will choose the greater one, which is `7` here, as the result.
-
-Either one of the `coresPerReplica` or `nodesPerReplica` could be omitted. All of  `min`, `max` and
-`preventSinglePointFailure` is optional. If not set, `min` would be default to `1`,
-`preventSinglePointFailure` will be default to `false`.
-
-Side notes:
-- Both `coresPerReplica` and `nodesPerReplica` are float.
-- The lowest replicas will be set to 1 when `min` is less than 1.
-
-### Ladder Mode
-
-Parameters in ConfigMap must be JSON and use `ladder` as key. The sub-keys as below indicates:
+For example, consider a Deployment that needs to scale its resources (cpu, memory, etc...) proportional to the number of
+cores in a cluster.
 
 ```
-data:
-  ladder: |-
-    {
-      "coresToReplicas":
-      [
-        [ 1, 1 ],
-        [ 64, 3 ],
-        [ 512, 5 ],
-        [ 1024, 7 ],
-        [ 2048, 10 ],
-        [ 4096, 15 ]
-      ],
-      "nodesToReplicas":
-      [
-        [ 1, 1 ],
-        [ 2, 2 ]
-      ]
-    }
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: thing
+  namespace: kube-system
+  labels:
+    k8s-app: thing
+spec:
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        k8s-app: thing
+    spec:
+      containers:
+      - image: thing/thing-v0.0.1
+        name: thing
 ```
 
-The ladder controller gives out the desired replicas count by using a step function.
-The step ladder function uses the datapoint for core and node scaling from the ConfigMap.
-The lookup which yields the higher number of replicas will be used as the target scaling number.
+```
+kubectl create -f thing.yaml
+```
 
-For instance, given a cluster comes with `100` nodes and `400` cores and it is using above ConfigMap.  
-The replicas derived from "cores_to_replicas_map" would be `3` (because `64` < `400` < `512`).  
-The replicas derived from "nodes_to_replicas_map" would be `2` (because `100` > `2`).   
-And we would choose the larger one `3`.
 
-Either one of the `coresToReplicas` or `nodesToReplicas` could be omitted. All elements in them should
-be int.
+The below config will scale the above defined deployment's CPU resource by "100m" increments 
+for every 10 nodes that are added to the cluster.
 
-The lowest number of replicas is set to 1.
-
-## Comparisons to the Horizontal Pod Autoscaler feature
-
-The [Horizontal Pod Autoscaler](http://kubernetes.io/docs/user-guide/horizontal-pod-autoscaling/) is a top-level Kubernetes API resource. It is a closed feedback loop autoscaler which monitors CPU utilization of the pods and scales the number of replicas automatically. It requires the CPU resources to be defined for all containers in the target pods and also requires heapster to be running to provide CPU utilization metrics.
-
-This horizontal cluster proportional autoscaler is a DIY container (because it is not a Kubernetes API resource) that provides a simple control loop that watches the cluster size and scales the target controller. The actual CPU or memory utilization of the target controller pods is not an input to the control loop, the sole inputs are number of schedulable cores and nodes in the cluster.
-There is no requirement to run heapster and/or provide CPU resource limits as in HPAs.
-
-The ConfigMap provides the operator with the ability to tune the replica scaling explicitly.
+```
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: thing-autoscaler
+  namespace: kube-system
+  labels:
+    k8s-app: thing-autoscaler
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  template:
+    metadata:
+      labels:
+        k8s-app: thing-autoscaler
+      annotations:
+        scheduler.alpha.kubernetes.io/critical-pod: ''
+    spec:
+      containers:
+      - name: autoscaler
+        image: gcr.io/google_containers/cluster-proportional-vertical-0autoscaler-amd64:1.0.0
+        resources:
+            requests:
+                cpu: "20m"
+                memory: "10Mi"
+        command:
+          - /cpvpa
+          - --target=deployment/thing
+          - --namespace=kube-system
+          - --logtostderr=true
+    	  - --poll-period-seconds=10
+          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","increment":"100m","nodesPerIncrement":"10"}}}}
+      tolerations:
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"
+      serviceAccountName: thing-autoscaler
+```
