@@ -1,18 +1,15 @@
 # Example files
 
-There are several example yaml files in this folder, each of them will create
-an autoscaler Deployment watches and resizes the replicas of the nginx server.
-They are using different control modes.
+This provides an example of using the cluster proportional vertical autoscaler
+to vertically scale the resources for an nginx server poportional to the size 
+of the cluster, in this case number of nodes.
 
 Use below commands to create / delete one of the example:
 ```
-kubectl create -f linear.yaml
+kubectl create -f cpvpa-nginx-example.yaml
 ...
-kubectl delete -f linear.yaml
+kubectl delete -f cpvpa-nginx-example.yaml
 ```
-P.S. You need to delete the created configMap explicitly when using
-*-defaultparams.yaml.
-
 # RBAC configurations
 
 RBAC authentication has been enabled by default in Kubernetes 1.6+. You will need
