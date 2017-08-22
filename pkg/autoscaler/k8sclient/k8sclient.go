@@ -23,12 +23,13 @@ import (
 
 	"github.com/golang/glog"
 
-	"k8s.io/client-go/1.4/kubernetes"
-	"k8s.io/client-go/1.4/pkg/api"
-	"k8s.io/client-go/1.4/pkg/api/resource"
-	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/rest"
-	"k8s.io/client-go/1.4/tools/clientcmd"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // K8sClient - Wraps all needed client functionalities for autoscaler
@@ -84,55 +85,54 @@ func makeTarget(client kubernetes.Interface, target, namespace string) (*targetS
 	kind := splits[0]
 	name := splits[1]
 
-	kind, apigroup, apiver, err := discoverAPI(client, kind)
+	kind, groupVersion, err := discoverAPI(client, kind)
 	if err != nil {
 		return &targetSpec{}, err
 	}
-	glog.V(4).Infof("discovered target %s = %s/%s.%s", target, apigroup, apiver, kind)
-	return &targetSpec{kind, apigroup, apiver, name, namespace}, nil
+	glog.V(4).Infof("discovered target %s = %s.%s", target, groupVersion, kind)
+	return &targetSpec{kind, groupVersion, name, namespace}, nil
 }
 
-func discoverAPI(client kubernetes.Interface, kindArg string) (kind, apigroup, apiver string, err error) {
-	kind = ""
-	plural := ""
+func discoverAPI(client kubernetes.Interface, kindArg string) (kind, groupVersion string, err error) {
+	var plural string
 	switch strings.ToLower(kindArg) {
 	case "deployment":
 		kind = "Deployment"
-		plural = "deployments"
+		plural = "Deployments"
 	case "daemonset":
 		kind = "DaemonSet"
-		plural = "daemonsets"
+		plural = "DaemonSets"
 	case "replicaset":
 		kind = "ReplicaSet"
 		plural = "ReplicaSets"
 	default:
-		return "", "", "", fmt.Errorf("unknown kind %q", kindArg)
+		return "", "", fmt.Errorf("unknown kind %q", kindArg)
 	}
-	resources, err := client.Discovery().ServerPreferredNamespacedResources()
+
+	resourceLists, err := client.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
+		return "", "", fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
 	}
-	apigroup = ""
-	apiver = ""
-	for _, res := range resources {
-		if res.Resource == plural {
-			// Avoid legacy "extensions" if we can.
-			if apigroup == "" || apigroup == "extensions" {
-				apigroup = res.Group
-				apiver = res.Version
+
+	for _, resourceList := range resourceLists {
+		groupVersion = resourceList.GroupVersion
+		for _, res := range resourceList.APIResources {
+			if res.Name == plural {
+				kind = res.Kind
+				groupVersion = resourceList.GroupVersion
 			}
 		}
 	}
-	return kind, apigroup, apiver, nil
+
+	return kind, groupVersion, nil
 }
 
 // targetSpec stores the scalable target resource.
 type targetSpec struct {
-	kind      string
-	group     string
-	version   string
-	name      string
-	namespace string
+	kind         string
+	groupVersion string
+	name         string
+	namespace    string
 }
 
 // ClusterSize defines the cluster status.
@@ -142,7 +142,7 @@ type ClusterSize struct {
 }
 
 func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
-	opt := api.ListOptions{Watch: false}
+	opt := metav1.ListOptions{Watch: false}
 
 	nodes, err := k.clientset.Core().Nodes().List(opt)
 	if err != nil || nodes == nil {
@@ -175,7 +175,7 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 		})
 	}
 	patch := map[string]interface{}{
-		"apiVersion": fmt.Sprintf("%s/%s", k.target.group, k.target.version),
+		"apiVersion": fmt.Sprintf("%s", k.target.groupVersion),
 		"kind":       k.target.kind,
 		"metadata": map[string]interface{}{
 			"name": k.target.name,
@@ -195,15 +195,15 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 	kind := strings.ToLower(k.target.kind)
 	switch kind {
 	case "deployment":
-		if _, err := k.clientset.Extensions().Deployments(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+		if _, err := k.clientset.Extensions().Deployments(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
 			return fmt.Errorf("patch failed: %v", err)
 		}
 	case "daemonset":
-		if _, err := k.clientset.Extensions().DaemonSets(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+		if _, err := k.clientset.Extensions().DaemonSets(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
 			return fmt.Errorf("patch failed: %v", err)
 		}
 	case "replicaset":
-		if _, err := k.clientset.Extensions().ReplicaSets(k.target.namespace).Patch(k.target.name, api.StrategicMergePatchType, jb); err != nil {
+		if _, err := k.clientset.Extensions().ReplicaSets(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
 			return fmt.Errorf("patch failed: %v", err)
 		}
 	default:

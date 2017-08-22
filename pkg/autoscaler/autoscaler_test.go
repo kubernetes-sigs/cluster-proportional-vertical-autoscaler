@@ -24,7 +24,7 @@ import (
 	"time"
 
 	k8sclient "github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient/testing"
-	"k8s.io/client-go/1.4/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 func TestRun(t *testing.T) {

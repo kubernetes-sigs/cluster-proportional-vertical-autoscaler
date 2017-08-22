@@ -25,9 +25,9 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/client-go/1.4/pkg/api/resource"
-	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
-	"k8s.io/client-go/1.4/pkg/util/clock"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/clock"
 
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"

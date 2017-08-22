@@ -18,7 +18,7 @@ package k8sclient
 
 import (
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
-	apiv1 "k8s.io/client-go/1.4/pkg/api/v1"
+	apiv1 "k8s.io/api/core/v1"
 )
 
 var _ = k8sclient.K8sClient(&MockK8sClient{})
