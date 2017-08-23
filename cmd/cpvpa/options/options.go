@@ -71,6 +71,7 @@ func (c *AutoScalerConfig) InitFlags() {
 	pflag.CommandLine.SetNormalizeFunc(WordSepNormalizeFunc)
 	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	pflag.Parse()
+	goflag.CommandLine.Parse([]string{}) // Hack to stop noisy logs.
 }
 
 // ValidateFlags validates whether flags are set up correctly
