@@ -109,7 +109,7 @@ func (s *AutoScaler) pollAPIServer() {
 	if s.currentConfig == nil || len(fileBytes) > 0 {
 		cfg := s.defaultConfig.DeepCopy()
 		if len(fileBytes) > 0 {
-			if err := json.Unmarshal(fileBytes, cfg); err != nil {
+			if err := json.Unmarshal(fileBytes, &cfg); err != nil {
 				glog.Errorf("Failed to unmarshal config file %q: %v", s.configFile, err)
 				return
 			}
