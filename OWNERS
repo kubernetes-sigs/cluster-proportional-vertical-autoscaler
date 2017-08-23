@@ -1,8 +1,8 @@
 # See the OWNERS file documentation:
 #  https://github.com/kubernetes/kubernetes/blob/master/docs/devel/owners.md
 
-assignees:
+approvers:
   - thockin
-  - erictune
+  - dnardo
   - zihongz
   - bowei
