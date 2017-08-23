@@ -1,0 +1,89 @@
+# Copyright 2016 The Kubernetes Authors. All rights reserved
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# TODO(dnardo): Update image with gcr image once we move this to
+# kubernetes-incubator
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-autoscaler
+  namespace: default
+data:
+  nginx-autoscaler: |-
+    {
+      "nginx-vertical-autoscale-example": {
+        "requests": {
+          "cpu": {
+            "base": "100m",
+            "increment": "100m",
+            "nodesPerIncrement": 1
+          }
+        }
+      }
+    }
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-vertical-autoscale-example
+  namespace: default
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: nginx-vertical-autoscale-example
+    spec:
+      containers:
+      - name: nginx-vertical-autoscale-example
+        image: nginx
+        ports:
+        - containerPort: 80
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-vertical-autoscaler
+  namespace: default
+  labels:
+    app: autoscaler
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: autoscaler
+    spec:
+      containers:
+        - image: dnardo/cpvpa-amd64:d4f6d2f
+          name: autoscaler
+          command:
+            - /cpvpa
+            - --target=deployment/nginx-vertical-autoscale-example
+            - --namespace=default
+            - --logtostderr=true
+            - --poll-period-seconds=10
+            - --v=2
+            - --config-file=/etc/config/nginx-autoscaler
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+      volumes:
+        - name: config
+          configMap:
+            name: nginx-autoscaler
+            optional: true
+      # Uncomment below line if you are using RBAC configs under the RBAC folder.              
+      # serviceAccountName: cluster-proportional-vertical-autoscaler-example
