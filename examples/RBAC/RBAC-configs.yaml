@@ -26,15 +26,9 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["list"]
-  - apiGroups: [""]
-    resources: ["replicationcontrollers/scale"]
-    verbs: ["get", "update"]
   - apiGroups: ["extensions"]
-    resources: ["deployments/scale", "replicasets/scale"]
-    verbs: ["get", "update"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "create"]
+    resources: ["deployments"]
+    verbs: ["patch"]
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1beta1
