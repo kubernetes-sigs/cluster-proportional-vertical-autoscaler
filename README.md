@@ -100,7 +100,7 @@ Example:
 ```
 
 ## Running the cluster-proportional-vertical-autoscaler
-This repo includes an example yaml files in the "Example" folder that can be used as examples demonstrating 
+This repo includes an example yaml files in the "examples" folder that can be used as examples demonstrating 
 how to use the vertical autoscaler.
 
 For example, consider a Deployment that needs to scale its resources (cpu, memory, etc...) proportional to the number of
@@ -154,7 +154,7 @@ spec:
     spec:
       containers:
       - name: autoscaler
-        image: gcr.io/google_containers/cluster-proportional-vertical-0autoscaler-amd64:1.0.0
+        image: gcr.io/google_containers/cluster-proportional-vertical-autoscaler-amd64:1.0.0
         resources:
             requests:
                 cpu: "20m"
