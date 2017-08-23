@@ -80,59 +80,173 @@ func NewK8sClient(namespace, target, kubeconfig string) (K8sClient, error) {
 func makeTarget(client kubernetes.Interface, target, namespace string) (*targetSpec, error) {
 	splits := strings.Split(target, "/")
 	if len(splits) != 2 {
-		return &targetSpec{}, fmt.Errorf("target format error: %v", target)
+		return nil, fmt.Errorf("target format error: %v", target)
 	}
 	kind := splits[0]
 	name := splits[1]
 
-	kind, groupVersion, err := discoverAPI(client, kind)
+	kind, groupVersions, err := discoverAPI(client, kind)
 	if err != nil {
-		return &targetSpec{}, err
+		return nil, err
 	}
-	glog.V(4).Infof("discovered target %s = %s.%s", target, groupVersion, kind)
-	return &targetSpec{kind, groupVersion, name, namespace}, nil
+
+	tgt, err := newTargetSpec(kind, groupVersions, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(4).Infof("Discovered target %s in %v", target, tgt.GroupVersion)
+	return tgt, nil
 }
 
-func discoverAPI(client kubernetes.Interface, kindArg string) (kind, groupVersion string, err error) {
+func discoverAPI(client kubernetes.Interface, kindArg string) (kind string, groupVersions map[string]bool, err error) {
 	var plural string
 	switch strings.ToLower(kindArg) {
 	case "deployment":
 		kind = "Deployment"
-		plural = "Deployments"
+		plural = "deployments"
 	case "daemonset":
 		kind = "DaemonSet"
-		plural = "DaemonSets"
+		plural = "daemonsets"
 	case "replicaset":
 		kind = "ReplicaSet"
-		plural = "ReplicaSets"
+		plural = "replicasets"
 	default:
-		return "", "", fmt.Errorf("unknown kind %q", kindArg)
+		return "", nil, fmt.Errorf("unknown kind %q", kindArg)
 	}
 
 	resourceLists, err := client.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
+		return "", nil, fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
 	}
 
+	groupVersions = map[string]bool{}
 	for _, resourceList := range resourceLists {
-		groupVersion = resourceList.GroupVersion
 		for _, res := range resourceList.APIResources {
 			if res.Name == plural {
 				kind = res.Kind
-				groupVersion = resourceList.GroupVersion
+				groupVersions[resourceList.GroupVersion] = true
 			}
 		}
 	}
 
-	return kind, groupVersion, nil
+	return kind, groupVersions, nil
 }
 
 // targetSpec stores the scalable target resource.
 type targetSpec struct {
-	kind         string
-	groupVersion string
-	name         string
-	namespace    string
+	Kind         string
+	GroupVersion string
+	Namespace    string
+	Name         string
+	patcher      patchFunc
+}
+
+// Captures the namespace and name to patch, and calls the best
+// resource-specific patch method.
+type patchFunc func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error
+
+func newTargetSpec(kind string, groupVersions map[string]bool, namespace, name string) (*targetSpec, error) {
+	groupVer, patcher, err := findPatcher(kind, groupVersions)
+	if err != nil {
+		return nil, err
+	}
+
+	return &targetSpec{
+		Kind:         kind,
+		GroupVersion: groupVer,
+		Namespace:    namespace,
+		Name:         name,
+		patcher:      patcher,
+	}, nil
+}
+
+func (tgt *targetSpec) Patch(client kubernetes.Interface, pt types.PatchType, data []byte) error {
+	return tgt.patcher(client, tgt.Namespace, tgt.Name, pt, data)
+}
+
+// findPatcher returns a groupVersion string and a patch function for the
+// specified kind.  This is needed because, at least in theory, the schema of a
+// resource could change dramatically, and we should use statically versioned
+// types everywhere.  In practice, it's unlikely that the bits we care about
+// would change (since we PATCH).  Alas, there's not a great way to dynamically
+// use whatever is "latest".  The fallout of this is that we will need to update
+// this program when new API group-versions are introduced.
+func findPatcher(kind string, groupVersions map[string]bool) (string, patchFunc, error) {
+	switch strings.ToLower(kind) {
+	case "deployment":
+		return findDeploymentPatcher(groupVersions)
+	case "daemonset":
+		return findDaemonSetPatcher(groupVersions)
+	case "replicaset":
+		return findReplicaSetPatcher(groupVersions)
+	}
+	// This should not happen, we already validated it.
+	return "", nil, fmt.Errorf("unknown target kind: %s", kind)
+}
+
+func findDeploymentPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
+	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1beta2"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta2().Deployments(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1beta2", patchFunc(fn), nil
+	}
+	if groupVersions["apps/v1beta1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta1().Deployments(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1beta1", patchFunc(fn), nil
+	}
+	if groupVersions["extensions/v1beta1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.ExtensionsV1beta1().Deployments(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "extensions/v1beta1", patchFunc(fn), nil
+	}
+	return "", nil, fmt.Errorf("no supported API group for target: %v", groupVersions)
+}
+
+func findDaemonSetPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
+	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1beta2"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta2().DaemonSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1beta2", patchFunc(fn), nil
+	}
+	if groupVersions["extensions/v1beta1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.ExtensionsV1beta1().DaemonSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "extensions/v1beta1", patchFunc(fn), nil
+	}
+	return "", nil, fmt.Errorf("no supported API group for target: %v", groupVersions)
+}
+
+func findReplicaSetPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
+	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1beta2"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta2().ReplicaSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1beta2", patchFunc(fn), nil
+	}
+	if groupVersions["extensions/v1beta1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.ExtensionsV1beta1().ReplicaSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "extensions/v1beta1", patchFunc(fn), nil
+	}
+	return "", nil, fmt.Errorf("no supported API group for target: %v", groupVersions)
 }
 
 // ClusterSize defines the cluster status.
@@ -175,10 +289,10 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 		})
 	}
 	patch := map[string]interface{}{
-		"apiVersion": fmt.Sprintf("%s", k.target.groupVersion),
-		"kind":       k.target.kind,
+		"apiVersion": fmt.Sprintf("%s", k.target.GroupVersion),
+		"kind":       k.target.Kind,
 		"metadata": map[string]interface{}{
-			"name": k.target.name,
+			"name": k.target.Name,
 		},
 		"spec": map[string]interface{}{
 			"template": map[string]interface{}{
@@ -188,26 +302,14 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 			},
 		},
 	}
+
 	jb, err := json.Marshal(patch)
 	if err != nil {
 		return fmt.Errorf("can't marshal patch to JSON: %v", err)
 	}
-	kind := strings.ToLower(k.target.kind)
-	switch kind {
-	case "deployment":
-		if _, err := k.clientset.Extensions().Deployments(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
-			return fmt.Errorf("patch failed: %v", err)
-		}
-	case "daemonset":
-		if _, err := k.clientset.Extensions().DaemonSets(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
-			return fmt.Errorf("patch failed: %v", err)
-		}
-	case "replicaset":
-		if _, err := k.clientset.Extensions().ReplicaSets(k.target.namespace).Patch(k.target.name, types.StrategicMergePatchType, jb); err != nil {
-			return fmt.Errorf("patch failed: %v", err)
-		}
-	default:
-		return fmt.Errorf("Unknown target format: must be one of deployment/*, daemonset/*, or replicaset/* (not case sensitive).")
+
+	if err := k.target.Patch(k.clientset, types.StrategicMergePatchType, jb); err != nil {
+		return fmt.Errorf("patch failed: %v", err)
 	}
 
 	return nil
