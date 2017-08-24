@@ -14,7 +14,7 @@
 
 # TODO(dnardo): Update image with gcr image once we move this to
 # kubernetes-incubator
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1beta1
 kind: Deployment
 metadata:
   name: nginx-vertical-autoscale-example

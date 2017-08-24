@@ -26,7 +26,7 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["list"]
-  - apiGroups: ["extensions"]
+  - apiGroups: ["apps", "extensions"]
     resources: ["deployments"]
     verbs: ["patch"]
 ---
