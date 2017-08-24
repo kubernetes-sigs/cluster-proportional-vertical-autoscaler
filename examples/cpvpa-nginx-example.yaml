@@ -56,6 +56,6 @@ spec:
             - --logtostderr=true
             - --poll-period-seconds=10
             - --v=2
-            - --default-config={"nginx-vertical-autoscale-example":{"requests":{"cpu":{"base":"100m","increment":"100m","nodesPerIncrement":1}}}}
+            - --default-config={"nginx-vertical-autoscale-example":{"requests":{"cpu":{"base":"100m","step":"100m","nodesPerStep":1}}}}
       # Uncomment below line if you are using RBAC configs under the RBAC folder.              
       # serviceAccountName: cluster-proportional-vertical-autoscaler-example
