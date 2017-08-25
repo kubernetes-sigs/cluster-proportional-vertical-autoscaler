@@ -45,10 +45,11 @@ type k8sClient struct {
 	target        *targetSpec
 	clientset     kubernetes.Interface
 	clusterStatus *ClusterSize
+	dryRun        bool
 }
 
 // NewK8sClient gives a k8sClient with the given dependencies.
-func NewK8sClient(namespace, target, kubeconfig string) (K8sClient, error) {
+func NewK8sClient(namespace, target, kubeconfig string, dryRun bool) (K8sClient, error) {
 	var config *rest.Config
 	var err error
 	if kubeconfig != "" {
@@ -74,6 +75,7 @@ func NewK8sClient(namespace, target, kubeconfig string) (K8sClient, error) {
 	return &k8sClient{
 		clientset: clientset,
 		target:    tgt,
+		dryRun:    dryRun,
 	}, nil
 }
 
@@ -308,6 +310,10 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 		return fmt.Errorf("can't marshal patch to JSON: %v", err)
 	}
 
+	if k.dryRun {
+		glog.Infof("Performing dry-run, no updates will take affect.")
+		return nil
+	}
 	if err := k.target.Patch(k.clientset, types.StrategicMergePatchType, jb); err != nil {
 		return fmt.Errorf("patch failed: %v", err)
 	}
