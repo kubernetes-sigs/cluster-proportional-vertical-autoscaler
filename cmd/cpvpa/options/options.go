@@ -36,6 +36,7 @@ type AutoScalerConfig struct {
 	PollPeriodSeconds int
 	Kubeconfig        string
 	PrintVer          bool
+	DryRun            bool
 }
 
 // NewAutoScalerConfig returns a Autoscaler config
@@ -45,6 +46,7 @@ func NewAutoScalerConfig() *AutoScalerConfig {
 		Namespace:         os.Getenv("MY_NAMESPACE"),
 		PollPeriodSeconds: 10,
 		PrintVer:          false,
+		DryRun:            false,
 	}
 }
 
@@ -57,6 +59,7 @@ func (c *AutoScalerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.PollPeriodSeconds, "poll-period-seconds", c.PollPeriodSeconds, "The period, in seconds, to poll cluster size and perform autoscaling.")
 	fs.StringVar(&c.Kubeconfig, "kubeconfig", c.Kubeconfig, "Path to a kubeconfig. Only required if running out-of-cluster.")
 	fs.BoolVar(&c.PrintVer, "version", c.PrintVer, "Print the version and exit.")
+	fs.BoolVar(&c.DryRun, "dry-run", c.PrintVer, "Calulate updates for a target but does not apply the update.")
 }
 
 // InitFlags no// WordSepNormalizeFunc changes all flags that contain "_" separators
