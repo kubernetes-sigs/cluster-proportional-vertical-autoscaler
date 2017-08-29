@@ -33,10 +33,10 @@ func TestRun(t *testing.T) {
   "fake-agent": {
     "requests": {
       "cpu": {
-        "base": "10m", "increment":"1m", "coresPerIncrement":1
+        "base": "10m", "step":"1m", "coresPerStep":1
       },
       "memory": {
-        "base": "8Mi", "increment":"1Mi", "coresPerIncrement":1
+        "base": "8Mi", "step":"1Mi", "coresPerStep":1
       }
     }
   }
@@ -68,28 +68,28 @@ func TestRun(t *testing.T) {
 }
 
 func TestCalculatePerCores(t *testing.T) {
-	var coresPerIncrement = `
+	var coresPerStep = `
 {
   "fake-agent": {
     "requests": {
       "cpu": {
-        "base": "%dm", "increment":"%dm", "coresPerIncrement":%d
+        "base": "%dm", "step":"%dm", "coresPerStep":%d
       }
     }
   }
 }
 `
 	for _, tt := range []struct {
-		name         string
-		numNodes     int
-		numCores     int
-		expVal       int64
-		base         int
-		increment    int
-		perIncrement int
+		name     string
+		numNodes int
+		numCores int
+		expVal   int64
+		base     int
+		step     int
+		perStep  int
 	}{
 		{
-			"base 10, increment 1,  per increment 1",
+			"base 10, step 1,  per step 1",
 			4,
 			7,
 			17,
@@ -98,7 +98,7 @@ func TestCalculatePerCores(t *testing.T) {
 			1,
 		},
 		{
-			"base 10, increment 2, per increment 1",
+			"base 10, step 2, per step 1",
 			4,
 			7,
 			24,
@@ -107,7 +107,7 @@ func TestCalculatePerCores(t *testing.T) {
 			1,
 		},
 		{
-			"base 10, increment 2, per increment 2",
+			"base 10, step 2, per step 2",
 			4,
 			20,
 			30,
@@ -116,7 +116,7 @@ func TestCalculatePerCores(t *testing.T) {
 			2,
 		},
 		{
-			"base 10, increment 4, per increment 3",
+			"base 10, step 4, per step 3",
 			4,
 			20,
 			20,
@@ -125,7 +125,7 @@ func TestCalculatePerCores(t *testing.T) {
 			2,
 		},
 		{
-			"base 10, increment 1, per increment 0",
+			"base 10, step 1, per step 0",
 			4,
 			20,
 			10,
@@ -134,7 +134,7 @@ func TestCalculatePerCores(t *testing.T) {
 			0,
 		},
 		{
-			"base 10, increment 1, per increment -22",
+			"base 10, step 1, per step -22",
 			4,
 			20,
 			10,
@@ -147,7 +147,7 @@ func TestCalculatePerCores(t *testing.T) {
 			NumOfNodes: tt.numNodes,
 			NumOfCores: tt.numCores,
 		}
-		conf := fmt.Sprintf(coresPerIncrement, tt.base, tt.increment, tt.perIncrement)
+		conf := fmt.Sprintf(coresPerStep, tt.base, tt.step, tt.perStep)
 		cfg := ScaleConfig{}
 		if err := json.Unmarshal([]byte(conf), &cfg); err != nil {
 			t.Fatalf("invalid default config: %v", err)
@@ -165,28 +165,28 @@ func TestCalculatePerCores(t *testing.T) {
 }
 
 func TestCalculatePerNodes(t *testing.T) {
-	var nodesPerIncrement = `
+	var nodesPerStep = `
 {
   "fake-agent": {
     "requests": {
       "cpu": {
-        "base": "%dm", "increment":"%dm", "nodesPerIncrement":%d
+        "base": "%dm", "step":"%dm", "nodesPerStep":%d
       }
     }
   }
 }
 `
 	for _, tt := range []struct {
-		name         string
-		numNodes     int
-		numCores     int
-		expVal       int64
-		base         int
-		increment    int
-		perIncrement int
+		name     string
+		numNodes int
+		numCores int
+		expVal   int64
+		base     int
+		step     int
+		perStep  int
 	}{
 		{
-			"base 10, increment 1,  per increment 1",
+			"base 10, step 1,  per step 1",
 			4,
 			7,
 			14,
@@ -195,7 +195,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			1,
 		},
 		{
-			"base 10, increment 2, per increment 1",
+			"base 10, step 2, per step 1",
 			4,
 			7,
 			18,
@@ -204,7 +204,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			1,
 		},
 		{
-			"base 10, increment 2, per increment 2",
+			"base 10, step 2, per step 2",
 			4,
 			20,
 			14,
@@ -213,7 +213,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			2,
 		},
 		{
-			"base 10, increment 4, per increment 3",
+			"base 10, step 4, per step 3",
 			4,
 			20,
 			12,
@@ -222,7 +222,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			2,
 		},
 		{
-			"base 10, increment 1, per increment 0",
+			"base 10, step 1, per step 0",
 			4,
 			20,
 			10,
@@ -231,7 +231,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			0,
 		},
 		{
-			"base 10, increment 1, per increment -2",
+			"base 10, step 1, per step -2",
 			4,
 			20,
 			10,
@@ -244,7 +244,7 @@ func TestCalculatePerNodes(t *testing.T) {
 			NumOfNodes: tt.numNodes,
 			NumOfCores: tt.numCores,
 		}
-		conf := fmt.Sprintf(nodesPerIncrement, tt.base, tt.increment, tt.perIncrement)
+		conf := fmt.Sprintf(nodesPerStep, tt.base, tt.step, tt.perStep)
 		cfg := ScaleConfig{}
 		if err := json.Unmarshal([]byte(conf), &cfg); err != nil {
 			t.Fatalf("invalid default config: %v", err)

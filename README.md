@@ -1,4 +1,4 @@
-# cluster-proportional-vertical-autoscaler
+# cluster-proportional-vertical-autoscaler (BETA)
 
 [![Build Status](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler.png)](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)](https://goreportcard.com/report/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
@@ -45,18 +45,18 @@ refreshes its parameters table every poll interval to be up to date with the lat
 ### Calculation of resource requests and limits
 
 The resource requests and limits are computed by using the number of cores and nodes as input as well as
-the provided increment values bounded by provided base and max values.
+the provided step values bounded by provided base and max values.
 
 Example:
 
 ```
 Base = 10
 Max = 100
-Increment = 2
-CoresPerIncrement = 4
-NodesPerIncrement = 2
+Step = 2
+CoresPerStep = 4
+NodesPerStep = 2
 
-The core and node counts are rounded up to the next whole increment.
+The core and node counts are rounded up to the next whole step.
 
 If we find 64 cores and 4 nodes we get scalars of:
   by-cores: 10 + (2 * (round(64, 4)/4)) = 10 + 32 = 42
@@ -74,9 +74,9 @@ If we find 3 cores and 3 nodes we get scalars of:
 The configuration should be in JSON format and supports the following parameters:
   - **base** The baseline quantity required.
   - **max**  The maximum allowed quantity.
-  - **increment** The amount of additional resources to grow by.  If this is too fine-grained, the resizing action will happen too frequently.
-  - **coresPerIncrement** The number of cores required to trigger an increment.
-  - **nodesPerIncrement** The number of nodes required to trigger an increment.
+  - **step** The amount of additional resources to grow by.  If this is too fine-grained, the resizing action will happen too frequently.
+  - **coresPerStep** The number of cores required to trigger an increase.
+  - **nodesPerStep** The number of nodes required to trigger an increase.
       
 Example:
 
@@ -84,16 +84,16 @@ Example:
 "containerA": {
   "requests": {
     "cpu": {
-      "base": "10m", "increment":"1m", "coresPerIncrement":1
+      "base": "10m", "step":"1m", "coresPerStep":1
     },
     "memory": {
-      "base": "8Mi", "increment":"1Mi", "coresPerIncrement":1
+      "base": "8Mi", "step":"1Mi", "coresPerStep":1
     }
   }
 "containerB": {
   "requests": {
     "cpu": {
-      "base": "250m", "increment":"100m", "coresPerIncrement":10
+      "base": "250m", "step":"100m", "coresPerStep":10
     },
   }
 }
@@ -131,7 +131,7 @@ kubectl create -f thing.yaml
 ```
 
 
-The below config will scale the above defined deployment's CPU resource by "100m" increments 
+The below config will scale the above defined deployment's CPU resource by "100m" step size
 for every 10 nodes that are added to the cluster.
 
 ```
@@ -165,7 +165,7 @@ spec:
           - --namespace=kube-system
           - --logtostderr=true
     	  - --poll-period-seconds=10
-          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","increment":"100m","nodesPerIncrement":"10"}}}}
+          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","step":"100m","nodesPerStep":"10"}}}}
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

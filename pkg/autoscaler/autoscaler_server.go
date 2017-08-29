@@ -173,23 +173,23 @@ func calculate(cfg ResourceScaleConfig, cluster *k8sclient.ClusterSize) int64 {
 	if cfg.Max != nil {
 		max = asInt64(cfg.Max)
 	}
-	var incr int64
-	if cfg.Increment != nil {
-		incr = asInt64(cfg.Increment)
+	var step int64
+	if cfg.Step != nil {
+		step = asInt64(cfg.Step)
 	}
 	var cpi int
-	if cfg.CoresPerIncrement != nil {
-		cpi = *cfg.CoresPerIncrement
+	if cfg.CoresPerStep != nil {
+		cpi = *cfg.CoresPerStep
 	}
 	var npi int
-	if cfg.NodesPerIncrement != nil {
-		npi = *cfg.NodesPerIncrement
+	if cfg.NodesPerStep != nil {
+		npi = *cfg.NodesPerStep
 	}
-	wantByCores := base + (incr * int64(increments(cluster.Cores, cpi)))
+	wantByCores := base + (step * int64(increments(cluster.Cores, cpi)))
 	if max < 0 && wantByCores > max {
 		wantByCores = max
 	}
-	wantByNodes := base + (incr * int64(increments(cluster.Nodes, npi)))
+	wantByNodes := base + (step * int64(increments(cluster.Nodes, npi)))
 	if max > 0 && wantByNodes > max {
 		wantByNodes = max
 	}
@@ -241,11 +241,11 @@ type ContainerScaleConfig struct {
 // Example:
 //   Base = 10
 //   Max = 100
-//   Increment = 2
-//   CoresPerIncrement = 4
-//   NodesPerIncrement = 2
+//   Step = 2
+//   CoresPerStep = 4
+//   NodesPerStep = 2
 //
-//   The core and node counts are rounded up to the next whole increment.
+//   The core and node counts are rounded up to the next whole step.
 //
 //   If we find 64 cores and 4 nodes we get scalars of:
 //     by-cores: 10 + (2 * (round(64, 4)/4)) = 10 + 32 = 42
@@ -262,11 +262,11 @@ type ResourceScaleConfig struct {
 	Max *resource.Quantity
 	// The amount of additional resources to grow by.  If this is too
 	// fine-grained, the resizing action will happen too frequently.
-	Increment *resource.Quantity
-	// The number of cores required to trigger an increment.
-	CoresPerIncrement *int
-	// The number of nodes required to trigger an increment.
-	NodesPerIncrement *int
+	Step *resource.Quantity
+	// The number of cores required to trigger an increase.
+	CoresPerStep *int
+	// The number of nodes required to trigger an increase.
+	NodesPerStep *int
 }
 
 func (sc ScaleConfig) String() string {
@@ -302,14 +302,14 @@ func (rsc ResourceScaleConfig) String() string {
 	if rsc.Max != nil {
 		buf.WriteString(fmt.Sprintf("max=%s ", rsc.Max.String()))
 	}
-	if rsc.Increment != nil {
-		buf.WriteString(fmt.Sprintf("incr=%s ", rsc.Increment.String()))
+	if rsc.Step != nil {
+		buf.WriteString(fmt.Sprintf("incr=%s ", rsc.Step.String()))
 	}
-	if rsc.CoresPerIncrement != nil {
-		buf.WriteString(fmt.Sprintf("cores_incr=%d ", *rsc.CoresPerIncrement))
+	if rsc.CoresPerStep != nil {
+		buf.WriteString(fmt.Sprintf("cores_incr=%d ", *rsc.CoresPerStep))
 	}
-	if rsc.NodesPerIncrement != nil {
-		buf.WriteString(fmt.Sprintf("nodes_incr=%d ", *rsc.NodesPerIncrement))
+	if rsc.NodesPerStep != nil {
+		buf.WriteString(fmt.Sprintf("nodes_incr=%d ", *rsc.NodesPerStep))
 	}
 	buf.WriteString("}")
 	return buf.String()
@@ -347,16 +347,16 @@ func (rsc ResourceScaleConfig) DeepCopy() ResourceScaleConfig {
 	if rsc.Max != nil {
 		out.Max = rsc.Max.Copy()
 	}
-	if rsc.Increment != nil {
-		out.Increment = rsc.Increment.Copy()
+	if rsc.Step != nil {
+		out.Step = rsc.Step.Copy()
 	}
-	if rsc.CoresPerIncrement != nil {
-		out.CoresPerIncrement = new(int)
-		*out.CoresPerIncrement = *rsc.CoresPerIncrement
+	if rsc.CoresPerStep != nil {
+		out.CoresPerStep = new(int)
+		*out.CoresPerStep = *rsc.CoresPerStep
 	}
-	if rsc.NodesPerIncrement != nil {
-		out.NodesPerIncrement = new(int)
-		*out.NodesPerIncrement = *rsc.NodesPerIncrement
+	if rsc.NodesPerStep != nil {
+		out.NodesPerStep = new(int)
+		*out.NodesPerStep = *rsc.NodesPerStep
 	}
 	return out
 }

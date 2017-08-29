@@ -27,8 +27,8 @@ data:
         "requests": {
           "cpu": {
             "base": "100m",
-            "increment": "100m",
-            "nodesPerIncrement": 1
+            "step": "100m",
+            "nodesPerStep": 1
           }
         }
       }
