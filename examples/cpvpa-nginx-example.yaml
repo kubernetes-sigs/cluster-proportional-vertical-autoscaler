@@ -47,7 +47,7 @@ spec:
         app: autoscaler
     spec:
       containers:
-        - image: dnardo/cpvpa-amd64:f0fc64f
+        - image: gcr.io/google_containers/cpvpa-amd64:v0.6.0
           name: autoscaler
           command:
             - /cpvpa
