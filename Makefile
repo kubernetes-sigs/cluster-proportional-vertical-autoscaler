@@ -38,19 +38,7 @@ SRC_DIRS := cmd pkg # directories which hold app source (not vendored)
 
 ALL_ARCH := amd64 arm arm64 ppc64le
 
-# Set default base image dynamically for each arch
-ifeq ($(ARCH),amd64)
-    BASEIMAGE?=alpine
-endif
-ifeq ($(ARCH),arm)
-    BASEIMAGE?=armel/busybox
-endif
-ifeq ($(ARCH),arm64)
-    BASEIMAGE?=aarch64/busybox
-endif
-ifeq ($(ARCH),ppc64le)
-    BASEIMAGE?=ppc64le/busybox
-endif
+BASEIMAGE?=gcr.io/distroless/static:latest
 
 IMAGE := $(REGISTRY)/$(BIN)-$(ARCH)
 
