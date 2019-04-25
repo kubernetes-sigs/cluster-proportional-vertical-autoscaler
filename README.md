@@ -1,6 +1,6 @@
 # cluster-proportional-vertical-autoscaler (BETA)
 
-[![Build Status](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler.png)](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
+[![Build Status](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler.svg)](https://travis-ci.org/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
 [![Go Report Card](https://goreportcard.com/badge/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)](https://goreportcard.com/report/github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler)
 
 ## Overview
