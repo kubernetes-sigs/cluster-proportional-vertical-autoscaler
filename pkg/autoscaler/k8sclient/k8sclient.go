@@ -189,6 +189,13 @@ func findPatcher(kind string, groupVersions map[string]bool) (string, patchFunc,
 
 func findDeploymentPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
 	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1().Deployments(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1", patchFunc(fn), nil
+	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
 			_, err := client.AppsV1beta2().Deployments(namespace).Patch(name, pt, data)
@@ -215,6 +222,13 @@ func findDeploymentPatcher(groupVersions map[string]bool) (string, patchFunc, er
 
 func findDaemonSetPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
 	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1().DaemonSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1", patchFunc(fn), nil
+	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
 			_, err := client.AppsV1beta2().DaemonSets(namespace).Patch(name, pt, data)
@@ -234,6 +248,13 @@ func findDaemonSetPatcher(groupVersions map[string]bool) (string, patchFunc, err
 
 func findReplicaSetPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
 	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1().ReplicaSets(namespace).Patch(name, pt, data)
+			return err
+		}
+		return "apps/v1", patchFunc(fn), nil
+	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
 			_, err := client.AppsV1beta2().ReplicaSets(namespace).Patch(name, pt, data)

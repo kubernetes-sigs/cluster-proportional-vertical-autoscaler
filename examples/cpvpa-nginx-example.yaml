@@ -14,13 +14,16 @@
 
 # TODO(dnardo): Update image with gcr image once we move this to
 # kubernetes-incubator
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-vertical-autoscale-example
   namespace: default
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      run: nginx-vertical-autoscale-example
   template:
     metadata:
       labels:
@@ -32,7 +35,7 @@ spec:
         ports:
         - containerPort: 80
 ---
-apiVersion: extensions/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nginx-vertical-autoscaler
@@ -41,6 +44,9 @@ metadata:
     app: autoscaler
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: autoscaler
   template:
     metadata:
       labels:
