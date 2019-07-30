@@ -260,7 +260,7 @@ type ClusterSize struct {
 func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
 	opt := metav1.ListOptions{Watch: false}
 
-	nodes, err := k.clientset.Core().Nodes().List(opt)
+	nodes, err := k.clientset.CoreV1().Nodes().List(opt)
 	if err != nil || nodes == nil {
 		return nil, err
 	}
