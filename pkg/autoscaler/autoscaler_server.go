@@ -75,7 +75,7 @@ func NewAutoScaler(c *options.AutoScalerConfig) (*AutoScaler, error) {
 // number of replicas, compares them to the actual replicas, and
 // updates the target resource with the expected replicas if necessary.
 func (s *AutoScaler) Run() {
-	ticker := s.clock.Tick(s.pollPeriod)
+	ticker := s.clock.NewTicker(s.pollPeriod)
 	s.readyCh <- struct{}{} // For testing.
 
 	// Don't wait for ticker and execute pollAPIServer() for the first time.
@@ -83,7 +83,7 @@ func (s *AutoScaler) Run() {
 
 	for {
 		select {
-		case <-ticker:
+		case <-ticker.C():
 			s.pollAPIServer()
 		case <-s.stopCh:
 			return

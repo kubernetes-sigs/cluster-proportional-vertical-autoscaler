@@ -31,7 +31,7 @@ type MockK8sClient struct {
 
 // GetClusterSize mocks counting schedulable nodes and cores in the cluster
 func (k *MockK8sClient) GetClusterSize() (*k8sclient.ClusterSize, error) {
-	return &k8sclient.ClusterSize{k.NumOfNodes, k.NumOfCores}, nil
+	return &k8sclient.ClusterSize{Nodes: k.NumOfNodes, Cores: k.NumOfCores}, nil
 }
 
 // UpdateResources mocks updating resources needs for containers in the target
