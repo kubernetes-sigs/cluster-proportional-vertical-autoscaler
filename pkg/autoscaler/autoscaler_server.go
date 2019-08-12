@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"reflect"
 	"time"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -42,6 +43,7 @@ type AutoScaler struct {
 	configFile    string
 	lastFileInfo  os.FileInfo
 	currentConfig ScaleConfig
+	lastReqs      map[string]apiv1.ResourceRequirements
 	pollPeriod    time.Duration
 	clock         clock.Clock
 	stopCh        chan struct{}
@@ -129,19 +131,39 @@ func (s *AutoScaler) pollAPIServer() {
 			r := resource.NewQuantity(0, guessFormat(res))
 			r.SetMilli(want)
 			newReqs[ctr].Requests[apiv1.ResourceName(res)] = *r
-			glog.V(0).Infof("Setting %s requests[%q] = %v", ctr, res, r)
+			glog.V(4).Infof("Calculated %s requests[%q] = %v", ctr, res, r)
 		}
 		for res, cfg := range ctrcfg.Limits {
 			want := calculate(cfg, clusterSize)
 			r := resource.NewQuantity(0, guessFormat(res))
 			r.SetMilli(want)
 			newReqs[ctr].Limits[apiv1.ResourceName(res)] = *r
-			glog.V(0).Infof("Setting %s limits[%q] = %v", ctr, res, r)
+			glog.V(4).Infof("Calculated %s limits[%q] = %v", ctr, res, r)
 		}
 	}
+	if reflect.DeepEqual(s.lastReqs, newReqs) {
+		return
+	}
+
+	glog.V(0).Infof("Updating resource for nodes: %d, cores: %d",
+		clusterSize.Nodes, clusterSize.Cores)
+	logRequirements(newReqs)
 	// Update resource target with new resources.
 	if err = s.k8sClient.UpdateResources(newReqs); err != nil {
 		glog.Errorf("Update failure: %s", err)
+	} else {
+		s.lastReqs = newReqs
+	}
+}
+
+func logRequirements(reqs map[string]apiv1.ResourceRequirements) {
+	for ctr, req := range reqs {
+		for res, r := range req.Requests {
+			glog.V(0).Infof("Setting %s requests[%q] = %v", ctr, res, &r)
+		}
+		for res, r := range req.Limits {
+			glog.V(0).Infof("Setting %s limits[%q] = %v", ctr, res, &r)
+		}
 	}
 }
 
@@ -157,6 +179,7 @@ func (s *AutoScaler) readConfigFileIfChanged() ([]byte, error) {
 	if os.SameFile(fi, s.lastFileInfo) {
 		return nil, nil
 	}
+	s.lastFileInfo = fi
 	fb, err := ioutil.ReadFile(s.configFile)
 	if err != nil {
 		return nil, fmt.Errorf("can't read file %s: %v", s.configFile, err)
