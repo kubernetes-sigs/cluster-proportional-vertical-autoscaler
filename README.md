@@ -100,14 +100,14 @@ Example:
 ```
 
 ## Running the cluster-proportional-vertical-autoscaler
-This repo includes an example yaml files in the "examples" folder that can be used as examples demonstrating 
+This repo includes an example yaml files in the "examples" directory that can be used as examples demonstrating 
 how to use the vertical autoscaler.
 
 For example, consider a Deployment that needs to scale its resources (cpu, memory, etc...) proportional to the number of
 cores in a cluster.
 
-```
-apiVersion: extensions/v1beta1
+```yaml
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: thing
@@ -116,17 +116,20 @@ metadata:
     k8s-app: thing
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      k8s-app: thing
   template:
     metadata:
       labels:
         k8s-app: thing
     spec:
       containers:
-      - image: thing/thing-v0.0.1
+      - image: nginx
         name: thing
 ```
 
-```
+```bash
 kubectl create -f thing.yaml
 ```
 
@@ -134,8 +137,8 @@ kubectl create -f thing.yaml
 The below config will scale the above defined deployment's CPU resource by "100m" step size
 for every 10 nodes that are added to the cluster.
 
-```
-apiVersion: extensions/v1beta1
+```yaml
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: thing-autoscaler
@@ -145,6 +148,9 @@ metadata:
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
+  selector:
+    matchLabels:
+      k8s-app: thing-autoscaler
   template:
     metadata:
       labels:
@@ -154,18 +160,18 @@ spec:
     spec:
       containers:
       - name: autoscaler
-        image: gcr.io/google_containers/cluster-proportional-vertical-autoscaler-amd64:1.0.0
+        image: k8s.gcr.io/cpvpa-amd64:v0.8.1
         resources:
-            requests:
-                cpu: "20m"
-                memory: "10Mi"
+          requests:
+            cpu: "20m"
+            memory: "10Mi"
         command:
           - /cpvpa
           - --target=deployment/thing
           - --namespace=kube-system
           - --logtostderr=true
-    	  - --poll-period-seconds=10
-          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","step":"100m","nodesPerStep":"10"}}}}
+          - --poll-period-seconds=10
+          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","step":"100m","nodesPerStep":10}}}}
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
