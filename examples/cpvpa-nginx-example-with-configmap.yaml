@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(dnardo): Update image with gcr image once we move this to
-# kubernetes-incubator
-
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -73,7 +70,7 @@ spec:
         app: autoscaler
     spec:
       containers:
-        - image: gcr.io/google_containers/cpvpa-amd64:{LATEST_RELEASE}
+        - image: k8s.gcr.io/cpvpa-amd64:{LATEST_RELEASE}
           name: autoscaler
           command:
             - /cpvpa
