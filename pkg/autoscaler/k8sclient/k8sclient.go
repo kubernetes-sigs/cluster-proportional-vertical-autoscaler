@@ -19,9 +19,12 @@ package k8sclient
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/version"
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -60,6 +63,7 @@ func NewK8sClient(namespace, target, kubeconfig string, dryRun bool) (K8sClient,
 	if err != nil {
 		return nil, err
 	}
+	config.UserAgent = userAgent()
 	// Use protobufs for communication with apiserver.
 	config.ContentType = "application/vnd.kubernetes.protobuf"
 	clientset, err := kubernetes.NewForConfig(config)
@@ -77,6 +81,17 @@ func NewK8sClient(namespace, target, kubeconfig string, dryRun bool) (K8sClient,
 		target:    tgt,
 		dryRun:    dryRun,
 	}, nil
+}
+
+func userAgent() string {
+	command := ""
+	if len(os.Args) > 0 && len(os.Args[0]) > 0 {
+		command = filepath.Base(os.Args[0])
+	}
+	if len(command) == 0 {
+		command = "cpvpa"
+	}
+	return command + "/" + version.VERSION
 }
 
 func makeTarget(client kubernetes.Interface, target, namespace string) (*targetSpec, error) {
