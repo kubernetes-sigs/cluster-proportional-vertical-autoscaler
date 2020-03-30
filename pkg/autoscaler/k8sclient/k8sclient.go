@@ -140,8 +140,7 @@ func discoverAPI(client kubernetes.Interface, kindArg string) (kind string, grou
 	groupVersions = map[string]bool{}
 	for _, resourceList := range resourceLists {
 		for _, res := range resourceList.APIResources {
-			if res.Name == plural {
-				kind = res.Kind
+			if res.Name == plural && res.Kind == kind {
 				groupVersions[resourceList.GroupVersion] = true
 			}
 		}
