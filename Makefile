@@ -19,7 +19,7 @@ BIN := cpvpa
 PKG := github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler
 
 # Where to push the docker image.
-REGISTRY ?= staging-k8s.gcr.io
+REGISTRY ?= gcr.io/k8s-staging-cpa
 
 # Which architecture to build - see $(ALL_ARCH) for options.
 ARCH ?= amd64
