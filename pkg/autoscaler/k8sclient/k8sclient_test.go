@@ -62,6 +62,19 @@ func TestDiscoverAPI(t *testing.T) {
 				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
 			},
 		}
+
+		groups := metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
+				{
+					Name: "custom.group.example.com",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "custom.group.example.com/v1alpha1", Version: "v1alpha1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "custom.group.example.com/v1alpha1", Version: "v1alpha1"},
+				},
+			},
+		}
+
 		switch req.URL.Path {
 		case "/api":
 			obj = &metav1.APIVersions{
@@ -71,10 +84,16 @@ func TestDiscoverAPI(t *testing.T) {
 			}
 		case "/api/v1":
 			obj = &stable
+		case "/apis":
+			obj = &groups
+		case "/apis/custom.group.example.com/v1alpha1":
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
+
 		output, err := json.Marshal(obj)
 		if err != nil {
 			t.Fatalf("unexpected encoding error: %v", err)

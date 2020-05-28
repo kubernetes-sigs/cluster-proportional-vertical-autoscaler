@@ -23,13 +23,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/golang/glog"
 	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/version"
 
+	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -134,7 +135,10 @@ func discoverAPI(client kubernetes.Interface, kindArg string) (kind string, grou
 
 	resourceLists, err := client.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to discover apigroup for kind %q: %v", kind, err)
+		if !discovery.IsGroupDiscoveryFailedError(err) {
+			return "", nil, fmt.Errorf("failed to discover preferred resources: %v", err)
+		}
+		glog.Warningf("Failed to discover some groups: %v", err)
 	}
 
 	groupVersions = map[string]bool{}
@@ -144,6 +148,10 @@ func discoverAPI(client kubernetes.Interface, kindArg string) (kind string, grou
 				groupVersions[resourceList.GroupVersion] = true
 			}
 		}
+	}
+
+	if len(groupVersions) == 0 {
+		return "", nil, fmt.Errorf("failed to discover apigroup for kind %q", kind)
 	}
 
 	return kind, groupVersions, nil
