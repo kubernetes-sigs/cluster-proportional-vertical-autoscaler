@@ -3,6 +3,7 @@
 
 approvers:
   - thockin
-  - dnardo
   - MrHohn
   - bowei
+emeritus_approvers:
+- dnardo
