@@ -16,7 +16,7 @@
 BIN := cpvpa
 
 # This repo's root import path (under GOPATH).
-PKG := github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler
+PKG := github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler
 
 # Where to push the docker image.
 REGISTRY ?= gcr.io/k8s-staging-cpa

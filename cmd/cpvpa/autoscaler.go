@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler"
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/version"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/version"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"

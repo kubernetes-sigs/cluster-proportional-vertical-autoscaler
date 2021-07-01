@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/version"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/version"
 
 	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"

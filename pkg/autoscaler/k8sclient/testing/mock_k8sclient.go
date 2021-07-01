@@ -17,7 +17,7 @@ limitations under the License.
 package k8sclient
 
 import (
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
 	apiv1 "k8s.io/api/core/v1"
 )
 

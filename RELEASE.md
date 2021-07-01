@@ -7,7 +7,7 @@ The cluster-proportional-vertical-autoscaler (cpvpa) is released on an as-needed
 1. An OWNER (who must have push access to the `google_containers` project):
     1. Tags the commit approved for release with `git tag -s vx.x.x`. The `vx.x.x` is semver with a leading `v`.
     1. Runs `make push`, to build and push the container image for the release to `google_containers`.
-    1. Creates a [github release](https://github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/releases/new) with a message pointing to the pushed container image.
+    1. Creates a [github release](https://github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/releases/new) with a message pointing to the pushed container image.
 
 1. The release issue is closed.
 1. An announcement email is sent to `kubernetes-dev@googlegroups.com` with the subject `[ANNOUNCE] cluster-proportional-vertical-autoscaler vx.x.x is released`.

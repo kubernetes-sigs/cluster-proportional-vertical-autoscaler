@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	k8sclient "github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient/testing"
+	k8sclient "github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient/testing"
 	"k8s.io/apimachinery/pkg/util/clock"
 )
 
