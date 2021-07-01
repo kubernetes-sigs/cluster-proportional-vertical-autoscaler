@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/clock"
 
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
-	"github.com/kubernetes-incubator/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
+	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
 
 	"github.com/golang/glog"
 )
