@@ -35,6 +35,6 @@ func (k *MockK8sClient) GetClusterSize() (*k8sclient.ClusterSize, error) {
 }
 
 // UpdateResources mocks updating resources needs for containers in the target
-func (k *MockK8sClient) UpdateResources(resources map[string]apiv1.ResourceRequirements) error {
+func (k *MockK8sClient) UpdateResources(containers []apiv1.Container) error {
 	return nil
 }

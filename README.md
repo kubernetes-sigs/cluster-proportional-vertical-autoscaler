@@ -80,23 +80,28 @@ The configuration should be in JSON format and supports the following parameters
       
 Example:
 
-```
-"containerA": {
-  "requests": {
-    "cpu": {
-      "base": "10m", "step":"1m", "coresPerStep":1
-    },
-    "memory": {
-      "base": "8Mi", "step":"1Mi", "coresPerStep":1
+```json
+[
+  {
+    "name": "containerA",
+    "requests": {
+      "cpu": {
+        "base": "10m", "step": "1m", "coresPerStep": 1
+      },
+      "memory": {
+        "base": "8Mi", "step": "1Mi", "coresPerStep": 1
+      }
+    }
+  },
+  {
+    "name": "containerB",
+    "requests": {
+      "cpu": {
+        "base": "250m", "step": "100m", "coresPerStep": 10
+      }
     }
   }
-"containerB": {
-  "requests": {
-    "cpu": {
-      "base": "250m", "step":"100m", "coresPerStep":10
-    },
-  }
-}
+]
 ```
 
 ## Running the cluster-proportional-vertical-autoscaler
@@ -171,7 +176,17 @@ spec:
           - --namespace=kube-system
           - --logtostderr=true
           - --poll-period-seconds=10
-          - --default-config={"thing":{"requests":{"cpu":{"base":"250m","step":"100m","nodesPerStep":10}}}}
+          - |
+            --default-config=[
+              {
+                "name": "thing",
+                "requests": {
+                  "cpu": {
+                    "base": "250m", "step": "100m", "nodesPerStep": 10
+                  }
+                }
+              }
+            ]
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

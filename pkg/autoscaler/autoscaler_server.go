@@ -43,7 +43,7 @@ type AutoScaler struct {
 	configFile    string
 	lastFileInfo  os.FileInfo
 	currentConfig ScaleConfig
-	lastReqs      map[string]apiv1.ResourceRequirements
+	lastCtrs      []apiv1.Container
 	pollPeriod    time.Duration
 	clock         clock.Clock
 	stopCh        chan struct{}
@@ -120,49 +120,52 @@ func (s *AutoScaler) pollAPIServer() {
 		glog.V(0).Infof("setting config = %s", s.currentConfig)
 	}
 
-	newReqs := map[string]apiv1.ResourceRequirements{}
-	for ctr, ctrcfg := range s.currentConfig {
-		newReqs[ctr] = apiv1.ResourceRequirements{
-			Requests: map[apiv1.ResourceName]resource.Quantity{},
-			Limits:   map[apiv1.ResourceName]resource.Quantity{},
-		}
+	newCtrs := []apiv1.Container{}
+	for ctri, ctrcfg := range s.currentConfig {
+		newCtrs = append(newCtrs, apiv1.Container{
+			Name: ctrcfg.Name,
+			Resources: apiv1.ResourceRequirements{
+				Requests: map[apiv1.ResourceName]resource.Quantity{},
+				Limits:   map[apiv1.ResourceName]resource.Quantity{},
+			},
+		})
 		for res, cfg := range ctrcfg.Requests {
 			want := calculate(cfg, clusterSize)
 			r := resource.NewQuantity(0, guessFormat(res))
 			r.SetMilli(want)
-			newReqs[ctr].Requests[apiv1.ResourceName(res)] = *r
-			glog.V(4).Infof("Calculated %s requests[%q] = %v", ctr, res, r)
+			newCtrs[ctri].Resources.Requests[apiv1.ResourceName(res)] = *r
+			glog.V(4).Infof("Calculated %s requests[%q] = %v", ctrcfg.Name, res, r)
 		}
 		for res, cfg := range ctrcfg.Limits {
 			want := calculate(cfg, clusterSize)
 			r := resource.NewQuantity(0, guessFormat(res))
 			r.SetMilli(want)
-			newReqs[ctr].Limits[apiv1.ResourceName(res)] = *r
-			glog.V(4).Infof("Calculated %s limits[%q] = %v", ctr, res, r)
+			newCtrs[ctri].Resources.Limits[apiv1.ResourceName(res)] = *r
+			glog.V(4).Infof("Calculated %s limits[%q] = %v", ctrcfg.Name, res, r)
 		}
 	}
-	if reflect.DeepEqual(s.lastReqs, newReqs) {
+	if reflect.DeepEqual(s.lastCtrs, newCtrs) {
 		return
 	}
 
 	glog.V(0).Infof("Updating resource for nodes: %d, cores: %d",
 		clusterSize.Nodes, clusterSize.Cores)
-	logRequirements(newReqs)
+	logRequirements(newCtrs)
 	// Update resource target with new resources.
-	if err = s.k8sClient.UpdateResources(newReqs); err != nil {
+	if err = s.k8sClient.UpdateResources(newCtrs); err != nil {
 		glog.Errorf("Update failure: %s", err)
 	} else {
-		s.lastReqs = newReqs
+		s.lastCtrs = newCtrs
 	}
 }
 
-func logRequirements(reqs map[string]apiv1.ResourceRequirements) {
-	for ctr, req := range reqs {
-		for res, r := range req.Requests {
-			glog.V(0).Infof("Setting %s requests[%q] = %v", ctr, res, &r)
+func logRequirements(ctrs []apiv1.Container) {
+	for _, ctr := range ctrs {
+		for res, r := range ctr.Resources.Requests {
+			glog.V(0).Infof("Setting %s requests[%q] = %v", ctr.Name, res, &r)
 		}
-		for res, r := range req.Limits {
-			glog.V(0).Infof("Setting %s limits[%q] = %v", ctr, res, &r)
+		for res, r := range ctr.Resources.Limits {
+			glog.V(0).Infof("Setting %s limits[%q] = %v", ctr.Name, res, &r)
 		}
 	}
 }
@@ -249,10 +252,11 @@ func guessFormat(res string) resource.Format {
 }
 
 // ScaleConfig maps container names to per-container configs.
-type ScaleConfig map[string]ContainerScaleConfig
+type ScaleConfig []ContainerScaleConfig
 
 // ContainmerScaleConfig holds per-container per-resource configs.
 type ContainerScaleConfig struct {
+	Name     string
 	Requests map[string]ResourceScaleConfig
 	Limits   map[string]ResourceScaleConfig
 }
@@ -294,23 +298,23 @@ type ResourceScaleConfig struct {
 
 func (sc ScaleConfig) String() string {
 	var buf bytes.Buffer
-	buf.WriteString("{ ")
-	for k, v := range sc {
-		buf.WriteString(fmt.Sprintf("[%s]: %s, ", k, v))
+	buf.WriteString("[ ")
+	for _, csc := range sc {
+		buf.WriteString(fmt.Sprintf("%s, ", csc))
 	}
-	buf.WriteString("}")
+	buf.WriteString("]")
 	return buf.String()
 }
 
 func (csc ContainerScaleConfig) String() string {
 	var buf bytes.Buffer
-	buf.WriteString("{ requests: { ")
+	buf.WriteString(fmt.Sprintf("{ name: %s, requests: { ", csc.Name))
 	for k, v := range csc.Requests {
 		buf.WriteString(fmt.Sprintf("[%s]: %s, ", k, v))
 	}
 	buf.WriteString(fmt.Sprintf("}, limits: { "))
 	for k, v := range csc.Limits {
-		buf.WriteString(fmt.Sprintf("[%s]: %s", k, v))
+		buf.WriteString(fmt.Sprintf("[%s]: %s, ", k, v))
 	}
 	buf.WriteString("} }")
 	return buf.String()
@@ -340,14 +344,15 @@ func (rsc ResourceScaleConfig) String() string {
 
 func (sc ScaleConfig) DeepCopy() ScaleConfig {
 	out := ScaleConfig{}
-	for k, v := range sc {
-		out[k] = v.DeepCopy()
+	for _, csc := range sc {
+		out = append(out, csc.DeepCopy())
 	}
 	return out
 }
 
 func (csc ContainerScaleConfig) DeepCopy() ContainerScaleConfig {
 	out := ContainerScaleConfig{
+		Name:     csc.Name,
 		Requests: map[string]ResourceScaleConfig{},
 		Limits:   map[string]ResourceScaleConfig{},
 	}

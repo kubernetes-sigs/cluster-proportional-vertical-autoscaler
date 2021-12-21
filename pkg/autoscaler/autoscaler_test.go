@@ -29,8 +29,9 @@ import (
 
 func TestRun(t *testing.T) {
 	var asConfig = `
-{
-  "fake-agent": {
+[
+  {
+    "name": "fake-agent",
     "requests": {
       "cpu": {
         "base": "10m", "step":"1m", "coresPerStep":1
@@ -40,7 +41,7 @@ func TestRun(t *testing.T) {
       }
     }
   }
-}
+]
 `
 	mockK8s := k8sclient.MockK8sClient{
 		NumOfNodes: 4,
@@ -69,15 +70,16 @@ func TestRun(t *testing.T) {
 
 func TestCalculatePerCores(t *testing.T) {
 	var coresPerStep = `
-{
-  "fake-agent": {
+[
+  {
+    "name": "fake-agent",
     "requests": {
       "cpu": {
         "base": "%dm", "step":"%dm", "coresPerStep":%d
       }
     }
   }
-}
+]
 `
 	for _, tt := range []struct {
 		name     string
@@ -157,7 +159,7 @@ func TestCalculatePerCores(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to get cluster size")
 		}
-		val := calculate(cfg["fake-agent"].Requests["cpu"], sz)
+		val := calculate(cfg[0].Requests["cpu"], sz)
 		if val != tt.expVal {
 			t.Errorf("expected %d got %d", tt.expVal, val)
 		}
@@ -166,15 +168,16 @@ func TestCalculatePerCores(t *testing.T) {
 
 func TestCalculatePerNodes(t *testing.T) {
 	var nodesPerStep = `
-{
-  "fake-agent": {
+[
+  {
+    "name": "fake-agent",
     "requests": {
       "cpu": {
         "base": "%dm", "step":"%dm", "nodesPerStep":%d
       }
     }
   }
-}
+]
 `
 	for _, tt := range []struct {
 		name     string
@@ -254,7 +257,7 @@ func TestCalculatePerNodes(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to get cluster size")
 		}
-		val := calculate(cfg["fake-agent"].Requests["cpu"], sz)
+		val := calculate(cfg[0].Requests["cpu"], sz)
 		if val != tt.expVal {
 			t.Errorf("expected %d got %d", tt.expVal, val)
 		}

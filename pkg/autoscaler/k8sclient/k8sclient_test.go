@@ -203,15 +203,18 @@ func TestUpdateResources(t *testing.T) {
 			target:    target,
 		}
 
-		newReqs := map[string]apiv1.ResourceRequirements{}
-		newReqs["thing"] = apiv1.ResourceRequirements{
-			Requests: map[apiv1.ResourceName]resource.Quantity{},
-			Limits:   map[apiv1.ResourceName]resource.Quantity{},
-		}
+		newCtrs := []apiv1.Container{}
+		newCtrs = append(newCtrs, apiv1.Container{
+			Name: "things",
+			Resources: apiv1.ResourceRequirements{
+				Requests: map[apiv1.ResourceName]resource.Quantity{},
+				Limits:   map[apiv1.ResourceName]resource.Quantity{},
+			},
+		})
 		r := resource.NewQuantity(0, resource.BinarySI)
 		r.SetMilli(10)
-		newReqs["thing"].Requests[apiv1.ResourceName("cpu")] = *r
-		if err := k8scli.UpdateResources(newReqs); err != nil {
+		newCtrs[0].Resources.Requests[apiv1.ResourceName("cpu")] = *r
+		if err := k8scli.UpdateResources(newCtrs); err != nil {
 			t.Errorf("failed to update resources for target %q: %v", tc.target, err)
 		}
 	}

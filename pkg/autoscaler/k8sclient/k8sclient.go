@@ -41,7 +41,7 @@ type K8sClient interface {
 	// GetClusterSize counts schedulable nodes and cores in the cluster
 	GetClusterSize() (*ClusterSize, error)
 	// UpdateResources updates the resource needs for the containers in the target
-	UpdateResources(resources map[string]apiv1.ResourceRequirements) error
+	UpdateResources(resources []apiv1.Container) error
 }
 
 // k8sClient - Wraps all Kubernetes API client functionality.
@@ -325,14 +325,7 @@ func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
 	return clusterStatus, nil
 }
 
-func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequirements) error {
-	ctrs := []interface{}{}
-	for ctrName, res := range resources {
-		ctrs = append(ctrs, map[string]interface{}{
-			"name":      ctrName,
-			"resources": res,
-		})
-	}
+func (k *k8sClient) UpdateResources(containers []apiv1.Container) error {
 	patch := map[string]interface{}{
 		"apiVersion": fmt.Sprintf("%s", k.target.GroupVersion),
 		"kind":       k.target.Kind,
@@ -342,7 +335,7 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 		"spec": map[string]interface{}{
 			"template": map[string]interface{}{
 				"spec": map[string]interface{}{
-					"containers": ctrs,
+					"containers": containers,
 				},
 			},
 		},

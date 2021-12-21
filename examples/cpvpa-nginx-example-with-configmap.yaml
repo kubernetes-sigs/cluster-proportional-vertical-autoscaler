@@ -19,8 +19,9 @@ metadata:
   namespace: default
 data:
   nginx-autoscaler: |-
-    {
-      "nginx-vertical-autoscale-example": {
+    [
+      {
+        "name": "nginx-vertical-autoscale-example",
         "requests": {
           "cpu": {
             "base": "100m",
@@ -29,7 +30,7 @@ data:
           }
         }
       }
-    }
+    ]
 ---
 apiVersion: apps/v1
 kind: Deployment
