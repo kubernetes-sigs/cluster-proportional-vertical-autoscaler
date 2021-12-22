@@ -68,6 +68,27 @@ func TestRun(t *testing.T) {
 	defer close(autoScaler.stopCh)
 }
 
+func TestParseLegacyConfig(t *testing.T) {
+	var legacyConfig = `
+{
+  "fake-agent": {
+    "requests": {
+      "cpu": {
+        "base": "10m", "step":"1m", "coresPerStep": 1
+      }
+    }
+  }
+}
+`
+	cfg, err := parseLegacyConfig([]byte(legacyConfig))
+	if err != nil {
+		t.Fatalf("invalid default config: %v", err)
+	}
+	if cfg[0].Name != "fake-agent" {
+		t.Errorf("expected %s got %s", "fake-agent", cfg[0].Name)
+	}
+}
+
 func TestCalculatePerCores(t *testing.T) {
 	var coresPerStep = `
 [

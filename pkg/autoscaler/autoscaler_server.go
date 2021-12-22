@@ -59,7 +59,11 @@ func NewAutoScaler(c *options.AutoScalerConfig) (*AutoScaler, error) {
 	cfg := ScaleConfig{}
 	if c.DefaultConfig != "" {
 		if err := json.Unmarshal([]byte(c.DefaultConfig), &cfg); err != nil {
-			return nil, fmt.Errorf("invalid default config: %v", err)
+			var err error
+			cfg, err = parseLegacyConfig([]byte(c.DefaultConfig))
+			if err != nil {
+				return nil, fmt.Errorf("invalid default config: %v", err)
+			}
 		}
 	}
 	return &AutoScaler{
@@ -112,7 +116,11 @@ func (s *AutoScaler) pollAPIServer() {
 		cfg := s.defaultConfig.DeepCopy()
 		if len(fileBytes) > 0 {
 			if err := json.Unmarshal(fileBytes, &cfg); err != nil {
-				glog.Errorf("Failed to unmarshal config file %q: %v", s.configFile, err)
+				var err error
+				cfg, err = parseLegacyConfig(fileBytes)
+				if err != nil {
+					glog.Errorf("Failed to unmarshal config file %q: %v", s.configFile, err)
+				}
 				return
 			}
 		}
@@ -294,6 +302,26 @@ type ResourceScaleConfig struct {
 	CoresPerStep *int
 	// The number of nodes required to trigger an increase.
 	NodesPerStep *int
+}
+
+func parseLegacyConfig(config []byte) (ScaleConfig, error) {
+	glog.Warning("legacy \"map\" configuration file format is deprecated and will be removed in v0.10.0")
+	lsc := map[string]struct {
+		Requests map[string]ResourceScaleConfig
+		Limits   map[string]ResourceScaleConfig
+	}{}
+	sc := ScaleConfig{}
+	if err := json.Unmarshal(config, &lsc); err != nil {
+		return nil, err
+	}
+	for ctr, ctrcfg := range lsc {
+		sc = append(sc, ContainerScaleConfig{
+			Name:     ctr,
+			Limits:   ctrcfg.Limits,
+			Requests: ctrcfg.Requests,
+		})
+	}
+	return sc, nil
 }
 
 func (sc ScaleConfig) String() string {
