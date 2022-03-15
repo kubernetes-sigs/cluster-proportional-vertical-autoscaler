@@ -209,7 +209,7 @@ func calculate(cfg ResourceScaleConfig, cluster *k8sclient.ClusterSize) int64 {
 		npi = *cfg.NodesPerStep
 	}
 	wantByCores := base + (step * int64(increments(cluster.Cores, cpi)))
-	if max < 0 && wantByCores > max {
+	if max > 0 && wantByCores > max {
 		wantByCores = max
 	}
 	wantByNodes := base + (step * int64(increments(cluster.Nodes, npi)))
