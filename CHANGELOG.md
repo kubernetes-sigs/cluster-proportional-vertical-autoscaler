@@ -1,3 +1,6 @@
+### Version 0.8.4 (Wed Jun 29 2022 Zihong Zheng <zihongz@google.com>)
+ - Build multi-arch image
+
 ### Version 0.8.3 (Fri May 29 2020 Zihong Zheng <zihongz@google.com>)
  - Tolerate partial API discovery
 
