@@ -51,7 +51,7 @@ spec:
         app: autoscaler
     spec:
       containers:
-        - image: k8s.gcr.io/cpvpa-amd64:{LATEST_RELEASE}
+        - image: registry.k8s.io/cpvpa-amd64:{LATEST_RELEASE}
           name: autoscaler
           command:
             - /cpvpa

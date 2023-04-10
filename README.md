@@ -160,7 +160,7 @@ spec:
     spec:
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cpvpa-amd64:v0.8.1
+        image: registry.k8s.io/cpvpa-amd64:v0.8.1
         resources:
           requests:
             cpu: "20m"
