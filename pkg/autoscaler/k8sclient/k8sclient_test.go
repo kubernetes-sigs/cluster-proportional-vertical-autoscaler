@@ -101,7 +101,7 @@ func TestDiscoverAPI(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(output)
+		_, _ = w.Write(output)
 	}))
 	defer server.Close()
 
@@ -126,6 +126,17 @@ func TestDiscoverAPI(t *testing.T) {
 func TestUpdateResources(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
+		groups := metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
+				{
+					Name: "extensions",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "extensions/v1beta1", Version: "v1beta1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "extensions/v1beta1", Version: "v1beta1"},
+				},
+			},
+		}
 		stable := metav1.APIResourceList{
 			GroupVersion: "extensions/v1beta1",
 			APIResources: []metav1.APIResource{
@@ -141,6 +152,8 @@ func TestUpdateResources(t *testing.T) {
 					"extensions/v1beta1",
 				},
 			}
+		case "/apis":
+			obj = &groups
 		case "/apis/extensions/v1beta1":
 			obj = &stable
 		case "/apis/extensions/v1beta1/namespaces/default/daemonsets/thing":
@@ -157,7 +170,7 @@ func TestUpdateResources(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(output)
+		_, _ = w.Write(output)
 	}))
 	defer server.Close()
 

@@ -14,7 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package version provides a place to store version information, which can be
+// set at build time.
 package version
 
-// VERSION defines the version
-var VERSION = "UNKNOWN"
+// Version is the app-global version string, which should be substituted with a
+// real value during build.
+var Version = "UNKNOWN"

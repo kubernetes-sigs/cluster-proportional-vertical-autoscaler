@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"reflect"
@@ -28,7 +27,7 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/utils/clock"
 
 	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/cmd/cpvpa/options"
 	"github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient"
@@ -45,7 +44,7 @@ type AutoScaler struct {
 	currentConfig ScaleConfig
 	lastReqs      map[string]apiv1.ResourceRequirements
 	pollPeriod    time.Duration
-	clock         clock.Clock
+	clock         clock.WithTicker
 	stopCh        chan struct{}
 	readyCh       chan<- struct{} // For testing.
 }
@@ -180,7 +179,7 @@ func (s *AutoScaler) readConfigFileIfChanged() ([]byte, error) {
 		return nil, nil
 	}
 	s.lastFileInfo = fi
-	fb, err := ioutil.ReadFile(s.configFile)
+	fb, err := os.ReadFile(s.configFile)
 	if err != nil {
 		return nil, fmt.Errorf("can't read file %s: %v", s.configFile, err)
 	}
@@ -308,7 +307,7 @@ func (csc ContainerScaleConfig) String() string {
 	for k, v := range csc.Requests {
 		buf.WriteString(fmt.Sprintf("[%s]: %s, ", k, v))
 	}
-	buf.WriteString(fmt.Sprintf("}, limits: { "))
+	buf.WriteString("}, limits: { ")
 	for k, v := range csc.Limits {
 		buf.WriteString(fmt.Sprintf("[%s]: %s", k, v))
 	}
@@ -365,13 +364,16 @@ func (rsc ResourceScaleConfig) DeepCopy() ResourceScaleConfig {
 	out := ResourceScaleConfig{}
 
 	if rsc.Base != nil {
-		out.Base = rsc.Base.Copy()
+		q := rsc.Base.DeepCopy()
+		out.Base = &q
 	}
 	if rsc.Max != nil {
-		out.Max = rsc.Max.Copy()
+		q := rsc.Max.DeepCopy()
+		out.Max = &q
 	}
 	if rsc.Step != nil {
-		out.Step = rsc.Step.Copy()
+		q := rsc.Step.DeepCopy()
+		out.Step = &q
 	}
 	if rsc.CoresPerStep != nil {
 		out.CoresPerStep = new(int)

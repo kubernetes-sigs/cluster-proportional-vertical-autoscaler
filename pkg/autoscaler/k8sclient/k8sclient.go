@@ -17,6 +17,7 @@ limitations under the License.
 package k8sclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -92,7 +93,7 @@ func userAgent() string {
 	if len(command) == 0 {
 		command = "cpvpa"
 	}
-	return command + "/" + version.VERSION
+	return command + "/" + version.Version
 }
 
 func makeTarget(client kubernetes.Interface, target, namespace string) (*targetSpec, error) {
@@ -213,28 +214,28 @@ func findDeploymentPatcher(groupVersions map[string]bool) (string, patchFunc, er
 	// Find the best API to use - newest API first.
 	if groupVersions["apps/v1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1().Deployments(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1().Deployments(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1", patchFunc(fn), nil
 	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1beta2().Deployments(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1beta2().Deployments(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1beta2", patchFunc(fn), nil
 	}
 	if groupVersions["apps/v1beta1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1beta1().Deployments(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1beta1().Deployments(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1beta1", patchFunc(fn), nil
 	}
 	if groupVersions["extensions/v1beta1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.ExtensionsV1beta1().Deployments(namespace).Patch(name, pt, data)
+			_, err := client.ExtensionsV1beta1().Deployments(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "extensions/v1beta1", patchFunc(fn), nil
@@ -246,21 +247,21 @@ func findDaemonSetPatcher(groupVersions map[string]bool) (string, patchFunc, err
 	// Find the best API to use - newest API first.
 	if groupVersions["apps/v1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1().DaemonSets(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1().DaemonSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1", patchFunc(fn), nil
 	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1beta2().DaemonSets(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1beta2().DaemonSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1beta2", patchFunc(fn), nil
 	}
 	if groupVersions["extensions/v1beta1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.ExtensionsV1beta1().DaemonSets(namespace).Patch(name, pt, data)
+			_, err := client.ExtensionsV1beta1().DaemonSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "extensions/v1beta1", patchFunc(fn), nil
@@ -272,21 +273,21 @@ func findReplicaSetPatcher(groupVersions map[string]bool) (string, patchFunc, er
 	// Find the best API to use - newest API first.
 	if groupVersions["apps/v1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1().ReplicaSets(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1().ReplicaSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1", patchFunc(fn), nil
 	}
 	if groupVersions["apps/v1beta2"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.AppsV1beta2().ReplicaSets(namespace).Patch(name, pt, data)
+			_, err := client.AppsV1beta2().ReplicaSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "apps/v1beta2", patchFunc(fn), nil
 	}
 	if groupVersions["extensions/v1beta1"] {
 		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
-			_, err := client.ExtensionsV1beta1().ReplicaSets(namespace).Patch(name, pt, data)
+			_, err := client.ExtensionsV1beta1().ReplicaSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
 			return err
 		}
 		return "extensions/v1beta1", patchFunc(fn), nil
@@ -303,7 +304,7 @@ type ClusterSize struct {
 func (k *k8sClient) GetClusterSize() (clusterStatus *ClusterSize, err error) {
 	opt := metav1.ListOptions{Watch: false}
 
-	nodes, err := k.clientset.CoreV1().Nodes().List(opt)
+	nodes, err := k.clientset.CoreV1().Nodes().List(context.TODO(), opt)
 	if err != nil || nodes == nil {
 		return nil, err
 	}
@@ -334,7 +335,7 @@ func (k *k8sClient) UpdateResources(resources map[string]apiv1.ResourceRequireme
 		})
 	}
 	patch := map[string]interface{}{
-		"apiVersion": fmt.Sprintf("%s", k.target.GroupVersion),
+		"apiVersion": k.target.GroupVersion,
 		"kind":       k.target.Kind,
 		"metadata": map[string]interface{}{
 			"name": k.target.Name,
