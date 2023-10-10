@@ -10,7 +10,7 @@ The cluster-proportional-vertical-autoscaler (cpvpa) is released on an as-needed
     1. Creates a [github release](https://github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/releases/new) with a message pointing to the pushed container image.
 
 1. The release issue is closed.
-1. An announcement email is sent to `kubernetes-dev@googlegroups.com` with the subject `[ANNOUNCE] cluster-proportional-vertical-autoscaler vx.x.x is released`.
+1. An announcement email is sent to `dev@kubernetes.io` with the subject `[ANNOUNCE] cluster-proportional-vertical-autoscaler vx.x.x is released`.
 
 Example:
 
@@ -27,13 +27,11 @@ v2.0.0
 
 $ git tag -am "v2.0.1" v2.0.1
 
-$ make container
+$ make manifest-list
 <...lots of output...>
-container: registry.k8s.io/cpa/cpvpa-amd64:v2.0.1
+Digest: sha256:abd3f14ed2b091006ba81b3f3dc191f7400d64c7fb0765699f92d5d008df0c33 1556
 
-$ gcloud docker -- push registry.k8s.io/cpa/cpvpa-amd64:v2.0.1
-<...lots of output...>
-v2.0.1: digest: sha256:504833aedf3f14379e73296240ed44d54aecd4c02367b004452dfeca2465e5bf size: 950
+# Promote from k8s-staging-cpa to registry.k8s.io/cpa.
 
-# Create the github release for v2.0.1, with body "registry.k8s.io/cpa/cpvpa-amd64:v2.0.1".
+# Create the github release for v2.0.1, with body "registry.k8s.io/cpa/cpvpa:v2.0.1".
 ```
