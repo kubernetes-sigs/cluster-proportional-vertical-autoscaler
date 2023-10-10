@@ -24,7 +24,7 @@ import (
 	"time"
 
 	k8sclient "github.com/kubernetes-sigs/cluster-proportional-vertical-autoscaler/pkg/autoscaler/k8sclient/testing"
-	"k8s.io/apimachinery/pkg/util/clock"
+	clocktesting "k8s.io/utils/clock/testing"
 )
 
 func TestRun(t *testing.T) {
@@ -47,7 +47,7 @@ func TestRun(t *testing.T) {
 		NumOfCores: 7,
 	}
 
-	fakeClock := clock.NewFakeClock(time.Now())
+	fakeClock := clocktesting.NewFakeClock(time.Now())
 	fakePollPeriod := 5 * time.Second
 	cfg := ScaleConfig{}
 	if err := json.Unmarshal([]byte(asConfig), &cfg); err != nil {

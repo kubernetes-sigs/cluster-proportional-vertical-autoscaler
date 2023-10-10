@@ -34,7 +34,7 @@ func main() {
 	config.InitFlags()
 
 	if config.PrintVer {
-		fmt.Printf("%s\n", version.VERSION)
+		fmt.Printf("%s\n", version.Version)
 		os.Exit(0)
 	}
 	// Perform further validation of flags.
