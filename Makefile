@@ -30,7 +30,7 @@ ALL_PLATFORMS ?= linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
 
 # The "FROM" part of the Dockerfile.  This should be a manifest-list which
 # supports all of the platforms listed in ALL_PLATFORMS.
-BASE_IMAGE ?= gcr.io/distroless/static
+BASE_IMAGE ?= gcr.io/distroless/static:nonroot
 
 # Where to push the docker images.
 REGISTRY ?= gcr.io/k8s-staging-cpa
@@ -59,12 +59,12 @@ MAKEFLAGS += --warn-undefined-variables
 .SUFFIXES:
 
 # Used internally.  Users should pass GOOS and/or GOARCH.
-OS := $(if $(GOOS),$(GOOS),$(shell go env GOOS))
-ARCH := $(if $(GOARCH),$(GOARCH),$(shell go env GOARCH))
+OS := $(if $(GOOS),$(GOOS),$(shell GOTOOLCHAIN=local go env GOOS))
+ARCH := $(if $(GOARCH),$(GOARCH),$(shell GOTOOLCHAIN=local go env GOARCH))
 
 TAG := $(VERSION)__$(OS)_$(ARCH)
 
-GO_VERSION := 1.22
+GO_VERSION := 1.23
 BUILD_IMAGE := golang:$(GO_VERSION)-alpine
 
 BIN_EXTENSION :=
@@ -232,7 +232,7 @@ $(LICENSES): | $(BUILD_DIRS)
 	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
 	    $(BUILD_IMAGE)                         \
-	    go install github.com/google/go-licenses
+	    go install github.com/google/go-licenses/v2
 	# The tool runs in a container because it execs `go`, which doesn't
 	# play nicely with CI.  The tool also wants its output dir to not
 	# exist, so we can't just volume mount $(LICENSES).
@@ -322,7 +322,20 @@ push: container
 
 # This depends on github.com/estesp/manifest-tool.
 manifest-list: # @HELP builds a manifest list of containers for all platforms
-manifest-list: all-push
+manifest-list: all-push manifest-tool
+	for bin in $(BINS); do                                    \
+	    platforms=$$(echo $(ALL_PLATFORMS) | sed 's/ /,/g');  \
+	    bin/tools/manifest-tool                               \
+	        --username="$(REGISTRY_USERNAME)"                 \
+	        --password="$(REGISTRY_PASSWORD)"                 \
+	        push from-args                                    \
+	        --platforms "$$platforms"                         \
+	        --template $(REGISTRY)/$$bin:$(VERSION)__OS_ARCH  \
+	        --target $(REGISTRY)/$$bin:$(VERSION);            \
+	done
+
+manifest-tool: # @HELP builds manifest-tool
+manifest-tool:
 	# Don't assume that `go` is available locally.
 	docker run                                 \
 	    -i                                     \
@@ -339,16 +352,6 @@ manifest-list: all-push
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
 	    $(BUILD_IMAGE)                         \
 	    go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool
-	for bin in $(BINS); do                                    \
-	    platforms=$$(echo $(ALL_PLATFORMS) | sed 's/ /,/g');  \
-	    bin/tools/manifest-tool                               \
-	        --username="$(REGISTRY_USERNAME)"                 \
-	        --password="$(REGISTRY_PASSWORD)"                 \
-	        push from-args                                    \
-	        --platforms "$$platforms"                         \
-	        --template $(REGISTRY)/$$bin:$(VERSION)__OS_ARCH  \
-	        --target $(REGISTRY)/$$bin:$(VERSION);            \
-	done
 
 version: # @HELP outputs the version string
 version:
