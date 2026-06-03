@@ -48,6 +48,10 @@ func TestDiscoverAPI(t *testing.T) {
 			false,
 		},
 		{
+			"statefulset",
+			false,
+		},
+		{
 			"replicationcontroller",
 			true,
 		},
@@ -60,6 +64,7 @@ func TestDiscoverAPI(t *testing.T) {
 				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 				{Name: "daemonsets", Namespaced: true, Kind: "DaemonSet"},
 				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				{Name: "statefulsets", Namespaced: true, Kind: "StatefulSet"},
 			},
 		}
 
@@ -135,14 +140,30 @@ func TestUpdateResources(t *testing.T) {
 					},
 					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "extensions/v1beta1", Version: "v1beta1"},
 				},
+				{
+					Name: "apps",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "apps/v1", Version: "v1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{GroupVersion: "apps/v1", Version: "v1"},
+				},
 			},
 		}
-		stable := metav1.APIResourceList{
+		extensionsResources := metav1.APIResourceList{
 			GroupVersion: "extensions/v1beta1",
 			APIResources: []metav1.APIResource{
 				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
 				{Name: "daemonsets", Namespaced: true, Kind: "DaemonSet"},
 				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+			},
+		}
+		appsResources := metav1.APIResourceList{
+			GroupVersion: "apps/v1",
+			APIResources: []metav1.APIResource{
+				{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+				{Name: "daemonsets", Namespaced: true, Kind: "DaemonSet"},
+				{Name: "replicasets", Namespaced: true, Kind: "ReplicaSet"},
+				{Name: "statefulsets", Namespaced: true, Kind: "StatefulSet"},
 			},
 		}
 		switch req.URL.Path {
@@ -155,10 +176,16 @@ func TestUpdateResources(t *testing.T) {
 		case "/apis":
 			obj = &groups
 		case "/apis/extensions/v1beta1":
-			obj = &stable
+			obj = &extensionsResources
+		case "/apis/apps/v1":
+			obj = &appsResources
 		case "/apis/extensions/v1beta1/namespaces/default/daemonsets/thing":
 		case "/apis/extensions/v1beta1/namespaces/default/replicasets/thing":
 		case "/apis/extensions/v1beta1/namespaces/default/deployments/thing":
+		case "/apis/apps/v1/namespaces/default/deployments/thing":
+		case "/apis/apps/v1/namespaces/default/daemonsets/thing":
+		case "/apis/apps/v1/namespaces/default/replicasets/thing":
+		case "/apis/apps/v1/namespaces/default/statefulsets/thing":
 		default:
 			w.WriteHeader(http.StatusNotFound)
 			return
@@ -197,6 +224,12 @@ func TestUpdateResources(t *testing.T) {
 			"replicaset/thing",
 			"replicaSet",
 			30,
+			false,
+		},
+		{
+			"statefulset/thing",
+			"statefulSet",
+			40,
 			false,
 		},
 	}

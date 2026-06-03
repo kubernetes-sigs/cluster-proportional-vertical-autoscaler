@@ -114,10 +114,11 @@ func isTargetFormatValid(target string) bool {
 
 	if strings.HasPrefix(target, "deployment/") ||
 		strings.HasPrefix(target, "daemonset/") ||
-		strings.HasPrefix(target, "replicaset/") {
+		strings.HasPrefix(target, "replicaset/") ||
+		strings.HasPrefix(target, "statefulset/") {
 		return true
 	}
 
-	glog.Errorf("Unknown target format: must be one of deployment/*, daemonset/*, or replicaset/* (not case sensitive).")
+	glog.Errorf("Unknown target format: must be one of deployment/*, daemonset/*, replicaset/*, or statefulset/* (not case sensitive).")
 	return false
 }
