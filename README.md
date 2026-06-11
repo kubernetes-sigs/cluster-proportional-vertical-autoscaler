@@ -6,7 +6,7 @@
 ## Overview
 
 This container image watches over the number of nodes and cores of the cluster and resizes
-the resource limits and requests for a DaemonSet, ReplicaSet, or Deployment. This functionality 
+the resource limits and requests for a DaemonSet, ReplicaSet, StatefulSet, or Deployment. This functionality 
 may be desirable for applications where resources such as cpu and memory for a particular job need 
 to be autoscaled with the size of the cluster.
 

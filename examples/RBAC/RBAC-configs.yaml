@@ -27,7 +27,7 @@ rules:
     resources: ["nodes"]
     verbs: ["list"]
   - apiGroups: ["apps", "extensions"]
-    resources: ["deployments"]
+    resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
     verbs: ["patch"]
 ---
 kind: ClusterRoleBinding
