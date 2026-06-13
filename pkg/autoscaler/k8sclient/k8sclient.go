@@ -130,6 +130,9 @@ func discoverAPI(client kubernetes.Interface, kindArg string) (kind string, grou
 	case "replicaset":
 		kind = "ReplicaSet"
 		plural = "replicasets"
+	case "statefulset":
+		kind = "StatefulSet"
+		plural = "statefulsets"
 	default:
 		return "", nil, fmt.Errorf("unknown kind %q", kindArg)
 	}
@@ -205,6 +208,8 @@ func findPatcher(kind string, groupVersions map[string]bool) (string, patchFunc,
 		return findDaemonSetPatcher(groupVersions)
 	case "replicaset":
 		return findReplicaSetPatcher(groupVersions)
+	case "statefulset":
+		return findStatefulSetPatcher(groupVersions)
 	}
 	// This should not happen, we already validated it.
 	return "", nil, fmt.Errorf("unknown target kind: %s", kind)
@@ -291,6 +296,32 @@ func findReplicaSetPatcher(groupVersions map[string]bool) (string, patchFunc, er
 			return err
 		}
 		return "extensions/v1beta1", patchFunc(fn), nil
+	}
+	return "", nil, fmt.Errorf("no supported API group for target: %v", groupVersions)
+}
+
+func findStatefulSetPatcher(groupVersions map[string]bool) (string, patchFunc, error) {
+	// Find the best API to use - newest API first.
+	if groupVersions["apps/v1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1().StatefulSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
+			return err
+		}
+		return "apps/v1", patchFunc(fn), nil
+	}
+	if groupVersions["apps/v1beta2"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta2().StatefulSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
+			return err
+		}
+		return "apps/v1beta2", patchFunc(fn), nil
+	}
+	if groupVersions["apps/v1beta1"] {
+		fn := func(client kubernetes.Interface, namespace, name string, pt types.PatchType, data []byte) error {
+			_, err := client.AppsV1beta1().StatefulSets(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{})
+			return err
+		}
+		return "apps/v1beta1", patchFunc(fn), nil
 	}
 	return "", nil, fmt.Errorf("no supported API group for target: %v", groupVersions)
 }

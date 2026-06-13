@@ -47,6 +47,14 @@ func TestIsTargetFormatValid(t *testing.T) {
 			true,
 		},
 		{
+			"statefulset/anything",
+			true,
+		},
+		{
+			"StateFulSet/anything",
+			true,
+		},
+		{
 			"replicationcontroller/anything",
 			false,
 		},
