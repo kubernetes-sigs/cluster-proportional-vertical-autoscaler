@@ -26,7 +26,7 @@ BINS ?= cpvpa
 
 # The platforms we support.  In theory this can be used for Windows platforms,
 # too, but they require specific base images, which we do not have.
-ALL_PLATFORMS ?= linux/amd64 linux/arm linux/arm64 linux/ppc64le linux/s390x
+ALL_PLATFORMS ?= linux/amd64 linux/arm64
 
 # The "FROM" part of the Dockerfile.  This should be a manifest-list which
 # supports all of the platforms listed in ALL_PLATFORMS.
@@ -302,7 +302,7 @@ $(CONTAINER_DOTFILES): .buildx-initialized
 	    --platform "$(OS)/$(ARCH)"                                  \
 	    --build-arg HTTP_PROXY="$(HTTP_PROXY)"                      \
 	    --build-arg HTTPS_PROXY="$(HTTPS_PROXY)"                    \
-	    -t $(REGISTRY)/$(BIN):$(TAG)                                \
+	    -t $(REGISTRY)/cluster-proportional-vertical-autoscaler:$(TAG)                                \
 	    -f .dockerfile-$(BIN)-$(OS)_$(ARCH)                         \
 	    .
 	docker images -q $(REGISTRY)/$(BIN):$(TAG) > $@
@@ -316,7 +316,7 @@ login: # @HELP configures docker to be authenticated to the defined registry
 push: # @HELP pushes the container for one platform ($OS/$ARCH) to the defined registry
 push: container
 	for bin in $(BINS); do                     \
-	    docker push $(REGISTRY)/$$bin:$(TAG);  \
+	    docker push $(REGISTRY)/cluster-proportional-vertical-autoscaler:$(TAG);  \
 	done
 	echo
 
@@ -330,8 +330,8 @@ manifest-list: all-push manifest-tool
 	        --password="$(REGISTRY_PASSWORD)"                 \
 	        push from-args                                    \
 	        --platforms "$$platforms"                         \
-	        --template $(REGISTRY)/$$bin:$(VERSION)__OS_ARCH  \
-	        --target $(REGISTRY)/$$bin:$(VERSION);            \
+	        --template $(REGISTRY)/cluster-proportional-vertical-autoscaler:$(VERSION)__OS_ARCH  \
+	        --target $(REGISTRY)/cluster-proportional-vertical-autoscaler:$(VERSION);            \
 	done
 
 manifest-tool: # @HELP builds manifest-tool
@@ -348,10 +348,12 @@ manifest-tool:
 	    --env GOCACHE="/.cache/gocache"        \
 	    --env GOMODCACHE="/.cache/gomodcache"  \
 	    --env CGO_ENABLED=0                    \
+	    --env GOOS=$(shell go env GOOS)        \
+	    --env GOARCH=$(shell go env GOARCH)    \
 	    --env HTTP_PROXY="$(HTTP_PROXY)"       \
 	    --env HTTPS_PROXY="$(HTTPS_PROXY)"     \
 	    $(BUILD_IMAGE)                         \
-	    go install github.com/estesp/manifest-tool/v2/cmd/manifest-tool
+	    go build -o /go/bin/manifest-tool github.com/estesp/manifest-tool/v2/cmd/manifest-tool
 
 version: # @HELP outputs the version string
 version:
